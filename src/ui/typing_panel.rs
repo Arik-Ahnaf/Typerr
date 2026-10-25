@@ -90,7 +90,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             );
             state.viewport.resize(
                 &measured,
-                size.height - 2.0 * theme::INSET,
+                size.height - 2.0 * theme::VERTICAL_INSET,
                 self.session.position(),
             );
             state.layout = Some(measured);
@@ -169,13 +169,27 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             return;
         };
         let inner_width = (bounds.width - 2.0 * theme::INSET).max(0.0);
-        let inner_height = (bounds.height - 2.0 * theme::INSET).max(0.0);
+        let inner_height = (bounds.height - 2.0 * theme::VERTICAL_INSET).max(0.0);
         let offset = state
             .viewport
             .content_origin(measured, inner_width, inner_height);
         let origin = Point::new(
             bounds.x + theme::INSET + offset.x,
-            bounds.y + theme::INSET + offset.y,
+            bounds.y + theme::VERTICAL_INSET + offset.y,
+        );
+        // Keep the monitor aligned with the measured, centered text block,
+        // including when only the final line remains or the window reflows.
+        let counter = format!(
+            "{}/{}",
+            self.session.completed_words(),
+            self.session.word_count()
+        );
+        renderer.fill_text(
+            text_definition(&counter, Size::new(inner_width, theme::LINE_HEIGHT))
+                .with_content(counter.clone()),
+            Point::new(origin.x, origin.y - 30.0),
+            theme::BLUE,
+            *_viewport,
         );
         let clip = Rectangle {
             x: origin.x,

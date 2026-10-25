@@ -37,6 +37,29 @@ impl TypingSession {
         self.entered.len()
     }
 
+    /// Counts fully entered target words, regardless of correctness. Separators
+    /// belong to neither word; deleting a word's last letter lowers the count.
+    pub fn completed_words(&self) -> usize {
+        self.word_ends()
+            .filter(|end| *end <= self.position())
+            .count()
+    }
+
+    pub fn word_count(&self) -> usize {
+        self.word_ends().count()
+    }
+
+    fn word_ends(&self) -> impl Iterator<Item = usize> + '_ {
+        self.target.iter().enumerate().filter_map(|(index, c)| {
+            (!c.is_whitespace()
+                && self
+                    .target
+                    .get(index + 1)
+                    .is_none_or(|next| next.is_whitespace()))
+            .then_some(index + 1)
+        })
+    }
+
     pub fn status(&self) -> SessionStatus {
         if self.position() == self.target.len() {
             SessionStatus::Complete
@@ -72,6 +95,25 @@ impl TypingSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn word_progress_tracks_boundaries_mistakes_backspace_and_completion() {
+        let mut session = TypingSession::new("ab cd e");
+        assert_eq!(session.word_count(), 3);
+        for (input, count) in [('x', 0), (' ', 1), ('x', 1), ('c', 1), ('d', 2)] {
+            session.input(input);
+            assert_eq!(session.completed_words(), count);
+        }
+        session.backspace();
+        assert_eq!(session.completed_words(), 1);
+        for input in "d e".chars() {
+            session.input(input);
+        }
+        assert_eq!(session.completed_words(), 3);
+        assert!(!session.backspace());
+        assert_eq!(session.completed_words(), 3);
+        assert_eq!(TypingSession::new("").completed_words(), 0);
+    }
 
     #[test]
     fn correct_wrong_and_unicode_inputs_use_character_positions() {

@@ -2,7 +2,7 @@
 
 ## Toolchain and dependencies
 
-Alpha 0.1 targets Rust **1.98.1**, edition 2024; Iced **0.14.0** with default native render backends and `advanced`; and rand **0.10.3**. The `rust-toolchain.toml` pin and `Cargo.lock` retain the toolchain and resolved dependency versions for reproducible builds.
+Alpha 0.1 targets Rust **1.98.1**, edition 2024; Iced **0.14.0** with default native render backends and `advanced`/`svg`; and rand **0.10.3**. The `rust-toolchain.toml` pin and `Cargo.lock` retain the toolchain and resolved dependency versions for reproducible builds.
 
 Planning-stage local observations:
 
@@ -15,7 +15,7 @@ These versions were inspected and the named 1.98.1 toolchain was subsequently in
 
 Both the stable alias and pinned `1.98.1` toolchain are installed locally, with rustfmt and Clippy. Approximately 8GiB RAM is available; use `CARGO_BUILD_JOBS=2` for initial Iced builds if necessary to limit concurrent compiler memory use. Verification commands used `CARGO_BUILD_JOBS=2` to limit concurrent compiler memory use.
 
-Use rustup with the pinned toolchain and its `rustfmt` and `clippy` components. Initial dependency resolution requires network access or a populated Cargo cache; the built application does not require network access. The font and word list are embedded, so no system installation of Google Sans Code is required.
+Use rustup with the pinned toolchain and its `rustfmt` and `clippy` components. Initial dependency resolution requires network access or a populated Cargo cache; the built application does not require network access. The Google Sans Code and Jomhuria fonts, SVG icons and word list are embedded, so no system installation of Google Sans Code is required.
 
 ## Setup and development commands
 
@@ -117,3 +117,9 @@ After this change, `cargo fmt --all -- --check`, `CARGO_BUILD_JOBS=2 cargo test 
 Native XWayland follow-up at 125% scaling: captured and inspected centered text/caret at startup and completion. Targeted Tab events restarted both active and completed sessions with fresh content and reset progress.
 
 The follow-up also visually verified centering at 1000 × 600 logical pixels and the completed single-line block; the final native session was restarted with Tab and returned to 700 × 400 logical pixels.
+
+### Typing-page follow-up — 2026-10-24
+
+The updated native page uses Iced's `svg` feature; `Cargo.lock` records the additional transitive SVG rendering dependencies. Connection links use `xdg-open` on Arch and `cmd /C start` on Windows. Building and typing remain offline; clicking a connection delegates `https://google.com` to the default browser. Jomhuria and its OFL license are bundled alongside the existing Google Sans Code font.
+
+Validation completed on 2026-10-25: formatting, strict Clippy, all 19 automated tests (13 library, 4 input policy, 2 integration), and locked debug/release builds passed on Arch Linux. `git diff --check` passed. The native debug window was launched outside the checkout on XWayland and its startup screenshot inspected at 125% scaling: bundled branding/icons, dark palette, blue word mode, 0/50 counter, and footer rendered correctly. Synthetic input attempts did not establish native counter/click behavior, so those runtime checks remain unverified; counter boundaries, mistakes, Backspace, and terminal completion are covered by automated tests. Native Windows, native Wayland, browser handoff, IME, and physical input remain unverified for this follow-up. No score page or packaged release was added.

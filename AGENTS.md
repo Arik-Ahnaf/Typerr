@@ -4,18 +4,18 @@
 
 Typerr is a native Rust typing application inspired by Monkeytype. Responsive input, accurate text layout, and eventually smooth caret movement take priority over feature count. Target platforms are Windows and Arch Linux. Develop through small, independently testable alpha versions.
 
-Alpha 0.1 (`0.1.0`) contains only the Main Typing page and a 50-word typing test. Tab restarts the race with 50 newly sampled words, including after completion. Do not implement navigation, Score, Dashboard, Settings, mode controls, icons, branding, decorative assets, statistics, timers, on-screen restart controls, persistence, or networking. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
+The current typing-page follow-up (`0.1.0`) contains the Main Typing page and a 50-word typing test. Tab restarts the race with 50 newly sampled words, including after completion. The 2026-10-24 request authorizes the updated Figma branding, SVG icons, inert top-right controls, live completed-word counter, connection links to https://google.com, and version/theme labels. Word mode is active and blue; all four top-right controls do nothing. Do not implement Score, Dashboard, Settings, mode switching, timers, on-screen restart controls, persistence, or application networking. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
 
 The UI must remain native. Do not add HTML, CSS, JavaScript, webviews, or embedded browsers.
 
 ## Technical decisions
 
 - Rust edition 2024, pinned toolchain `1.98.1`.
-- Iced `0.14.0`, native default render backends plus the `advanced` feature for a custom typing widget.
+- Iced `0.14.0`, native default render backends plus the `advanced` and `svg` features for a custom typing widget.
 - `rand` `0.10.3` for word selection, with injectable seeded randomness for tests.
 - Bundle an original curated list of approximately 200 common lowercase ASCII English words and the existing static Google Sans Code Regular font. Load both from compiled assets; do not require the source checkout or network at runtime.
 - Commit `Cargo.lock`. Add another dependency only for a concrete need; no additional shaping crate is planned.
-- Measure the embedded font through Iced's renderer/paragraph facilities. Do not estimate character advance from font size. The current English target is monospaced ASCII; future general Unicode layout will require a deliberate extension.
+- Measure the embedded font through Iced's renderer/paragraph facilities. Do not estimate character advance from font size. SVG support brings Iced's transitive SVG dependencies; no extra application shaping crate is used. The current English target is monospaced ASCII; future general Unicode layout will require a deliberate extension.
 
 ## Responsibilities
 
@@ -49,9 +49,9 @@ Small adjustments to this structure are acceptable when documented, but preserve
 
 ## Layout and viewport invariants
 
-- Startup and minimum window size are 700 × 400 logical pixels. At that size reproduce the reference's centered 640 × 250 panel with 30px horizontal and 75px vertical exterior margins. Let the panel grow with the window; retain a fixed 20px font and 25px line height.
+- Startup and minimum window size are 700 × 400 logical pixels. At that size reproduce the reference's centered 640 × 150 panel with 30px horizontal and 125px vertical exterior margins. Let the panel grow with the window; retain a fixed 16px font and 20px line height.
 - Always center the visible text block horizontally and vertically within the available area, including after scrolling, resizing, restart, and completion. Keep lines left-aligned within the centered block; glyphs, underlines, and caret share its origin. Rebuild cached layout when target text changes on restart.
-- Use approximately 20px inner padding and word wrapping based on measured monospaced advance. Reserve space for the caret and separator/error cells. Retain a safe character-wrap fallback for unexpectedly long words.
+- Use 20px horizontal and 15px vertical inner padding and word wrapping based on measured monospaced advance. Reserve space for the caret and separator/error cells. Retain a safe character-wrap fallback for unexpectedly long words.
 - Each visual line owns the separator after its final word. Stay on that line until the separator position is consumed; then put the next active line at the viewport top. Incorrect input at the separator also consumes it under the engine rules.
 - Show only whole text rows: use the floor of available text height divided by line height. Distribute spare vertical space around the centered block and clip overflow. Never expose a partially clipped bottom row.
 - After every completed visual line, its successor becomes the top row and completed text exits above. This is not conventional scroll-only-when-the-caret-reaches-the-bottom behavior.
@@ -63,11 +63,11 @@ Small adjustments to this structure are acceptable when documented, but preserve
 
 ## Visual reference
 
-Primary reference: [Typerr Figma](https://www.figma.com/design/80x3SZRgeqDp8xOz7FzGdU/Typerr?node-id=0-1), frame `1:2`, typing panel `7:60`, text `7:67`. Figma context and screenshots were inspected during planning; `design_references/Typing Page Outline.png` matches them.
+Primary reference: [Typerr Figma](https://www.figma.com/design/80x3SZRgeqDp8xOz7FzGdU/Typerr?node-id=0-1), current frame `54:22`, text `54:28`, counter `71:5`. `design_references/Typing Page.png` is the current rendered reference; the older Outline file marks layout areas only.
 
-References whose frame or image name ends in “Outline” use colorful rectangles only to mark general layout areas. Preserve their placement and spacing, but do not render those rectangle fills or borders as decoration. The typing panel is transparent and borderless over background `#333333`, using Google Sans Code Regular 20px and reference foreground `#F2F2F2`. Exclude the reference's branding, modes, and bottom controls because they are outside Alpha 0.1. This user clarification supersedes the initial interpretation of the cyan panel rectangle.
+References whose frame or image name ends in “Outline” use colorful rectangles only to mark general layout areas. Preserve their placement and spacing, but do not render those rectangle fills or borders as decoration. The typing panel is transparent and borderless over background `#282A36`, using Google Sans Code Regular 16px and reference foreground `#F8F8F2`. Use the bundled Jomhuria Regular at 48px for branding, `#44475A` control groups, and `#0088FF` for the current word mode and counter. The counter counts target words whose final character has been entered, regardless of correctness, and decreases when Backspace removes that character. It reaches 50/50 on completion and resets on Tab. Footer connections open the OS browser at https://google.com; version/theme labels are informational. This user clarification supersedes the initial interpretation of the cyan panel rectangle.
 
-Interaction defaults, not separately specified by the Figma placeholder: pending `#B4B4B4`, correct `#F2F2F2`, incorrect `#FF6B6B`, and thin caret `#00FDE8`. Base colors are opaque; preview opacity is an additional multiplier. Use `assets/fonts/Google_Sans_Code/static/GoogleSansCode-Regular.ttf` and preserve its OFL notice.
+Interaction defaults, not separately specified by the Figma placeholder: pending `#B4B4B4`, correct `#F8F8F2`, incorrect `#FF6B6B`, and thin caret `#00FDE8`. Base colors are opaque; preview opacity is an additional multiplier. Use `assets/fonts/Google_Sans_Code/static/GoogleSansCode-Regular.ttf` and preserve its OFL notice. Bundle `assets/fonts/Jomhuria/Jomhuria-Regular.ttf` with its OFL notice and embed the supplied SVGs. `src/ui/chrome.rs` owns the native header/footer composition.
 
 ## Workflow and quality
 

@@ -1,5 +1,9 @@
 use crate::ui::typing_panel::TypingPanel;
-use iced::{Element, Event, keyboard, widget::container, window};
+use iced::{
+    Element, Event, keyboard,
+    widget::{container, stack},
+    window,
+};
 use typerr::{engine::TypingSession, words};
 
 pub struct App {
@@ -16,6 +20,7 @@ struct MainTyping {
 #[derive(Debug, Clone)]
 pub enum Message {
     Native(Event),
+    OpenConnection,
 }
 
 impl Default for App {
@@ -33,6 +38,7 @@ impl Default for App {
 impl App {
     pub fn update(&mut self, message: Message) {
         match message {
+            Message::OpenConnection => open_connection(),
             Message::Native(Event::Window(window::Event::Focused)) => self.focused = true,
             Message::Native(Event::Window(window::Event::Unfocused)) => self.focused = false,
             Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
@@ -72,21 +78,49 @@ impl App {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        container(TypingPanel::new(
+        let typing = container(TypingPanel::new(
             &self.main.session,
             self.main.revision,
             Message::Native,
         ))
         .padding(iced::Padding {
-            top: 75.0,
-            bottom: 75.0,
+            top: 125.0,
+            bottom: 125.0,
             left: 30.0,
             right: 30.0,
         })
         .width(iced::Fill)
-        .height(iced::Fill)
+        .height(iced::Fill);
+        stack![
+            typing,
+            crate::ui::chrome::header(),
+            container(crate::ui::chrome::footer())
+                .height(iced::Fill)
+                .align_y(iced::Bottom),
+        ]
         .into()
     }
+}
+
+fn open_connection() {
+    // Hand off to the OS browser off the input thread and reap the launcher.
+    std::thread::spawn(|| {
+        #[cfg(target_os = "windows")]
+        let result = {
+            use std::os::windows::process::CommandExt;
+            std::process::Command::new("cmd")
+                .args(["/C", "start", "", "https://google.com"])
+                .creation_flags(0x0800_0000)
+                .status()
+        };
+        #[cfg(not(target_os = "windows"))]
+        let result = std::process::Command::new("xdg-open")
+            .arg("https://google.com")
+            .status();
+        if let Err(error) = result {
+            eprintln!("Could not open connection: {error}");
+        }
+    });
 }
 
 #[cfg(test)]

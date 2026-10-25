@@ -6,7 +6,7 @@ Current target: **Alpha 0.1**, crate version `0.1.0`.
 
 Deliver a native Rust/Iced Main Typing page with 50 randomly selected English words, responsive reflow, immediate input, expected-glyph error highlighting, Backspace, terminal completion, and a caret architecture ready for future animation.
 
-Only the typing panel is in scope. Do not implement secondary pages, navigation, branding, icons, mode controls, scores, statistics, timers, on-screen restart controls, persistence, networking, or full caret animation.
+The initial Alpha 0.1 scope below is historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. Score and other pages remain excluded.
 
 ## Planning decisions
 
@@ -52,10 +52,10 @@ The implementation agent must read all four guides first. The coordinating agent
 
 - The application is a native Iced program with no web interface.
 - Startup displays exactly 50 bundled English words; duplicate selections are allowed.
-- At 700 × 400, the centered typing panel matches the reference's 640 × 250 dimensions, 30px horizontal / 75px vertical exterior margins. Its background is transparent and it has no decorative border: the colorful rectangles in the Outline reference indicate general areas only.
+- At 700 × 400, the centered typing panel matches the reference's 640 × 150 dimensions, 30px horizontal / 125px vertical exterior margins. Its background is transparent and it has no decorative border: the colorful rectangles in the Outline reference indicate general areas only.
 - The visible text block is always centered horizontally and vertically, with shared left alignment within the block. Restart invalidates cached text layout and resets caret/scroll state.
-- Resizing grows/reflows the panel while retaining 20px type, 25px line height, and whole visible rows. No text row is partially clipped at the bottom.
-- Correct input uses `#F2F2F2`; pending text uses `#B4B4B4`; mistakes show the expected glyph in `#FF6B6B`. Incorrect expected spaces remain visibly marked.
+- Resizing grows/reflows the panel while retaining 16px type, 20px line height, and whole visible rows. No text row is partially clipped at the bottom.
+- Correct input uses `#F8F8F2`; pending text uses `#B4B4B4`; mistakes show the expected glyph in `#FF6B6B`. Incorrect expected spaces remain visibly marked.
 - Each printable input consumes one position regardless of correctness. Backspace corrects prior input and crosses word/line boundaries safely.
 - Completing a visual line includes consuming its trailing separator position, then makes the next active line the top visible line. Wrong input at that separator also advances.
 - The bottom visible row is a 50%-opacity preview only when more text exists below the viewport. It becomes opaque when moving upward. The active row is never faded.
@@ -98,7 +98,7 @@ The word list contains exactly 200 original curated words. Keyboard/focus events
 - Arch Linux release launch and the native XWayland checks above passed. Native Wayland and Windows build/runtime verification remain pending.
 - Alpha 0.1 uses a monospaced ASCII English target. Full IME/composition, international word sets, and advanced Unicode shaping are future work unless separately verified.
 - Smooth caret interpolation, configurable easing/duration, and animated line transitions are deferred; retain the independent target/rendered coordinate boundary now.
-- Score, Dashboard, Settings, additional modes, and on-screen restart controls require later version plans.
+- Score, Dashboard, Settings, functional mode switching, and on-screen restart controls require later version plans.
 - Installer creation, distribution automation, signing, and publication remain unimplemented; see `PACKAGING.md`.
 
 ## Follow-up: Tab restart and centering
@@ -115,3 +115,13 @@ The follow-up also visually verified centering at 1000 × 600 logical pixels and
 - Re-ran formatting, strict Clippy, all 18 automated tests, and locked debug/release builds successfully on Arch Linux before the initial Alpha 0.1 source upload.
 - Expanded `.gitignore` to exclude generated build/distribution output, editor/OS files, local environment secrets, logs, and unused font variants. The embedded Regular font, OFL notice, lockfile, tests, and design reference remain included.
 - No new GUI or Windows verification was performed for this source upload; the native evidence and limitations above still apply. Packaged releases remain future work.
+
+## Typing-page follow-up — 2026-10-24
+
+- Created `codex/typing-page-update` before implementation; existing untracked icons and reference image were retained.
+- Read Figma frame `54:22` and control groups `54:40` / `54:43`, comparing the local `Typing Page.png`. Adopted the dark palette, 16px/20px typing text, 640 × 150 typing area, branding, four inert top-right controls, and footer. Word mode is blue because the current session is 50 words; time mode remains inactive.
+- Embedded all ten supplied SVGs and Jomhuria Regular with its OFL license. Iced's `svg` feature adds its required transitive rendering dependencies; there is no new direct dependency.
+- Added a completed-target-word counter above the measured text origin. It counts each entered final letter regardless of correctness, reverses with Backspace, resets on Tab, and reaches 50/50 without navigating away.
+- Github, Twitter, and Discord launch `https://google.com` using the OS browser. Browser launch runs off the input thread; the process is reaped. Version/theme labels are informational.
+- Preserved synchronous native input, engine/layout boundaries, terminal completion, wrapping, centering, and viewport behavior. No score page or mode switching was implemented.
+- Validation completed on 2026-10-25: formatting, strict Clippy, all 19 automated tests (13 library, 4 input policy, 2 integration), and locked debug/release builds passed on Arch Linux. `git diff --check` passed. The native debug window was launched outside the checkout on XWayland and its startup screenshot inspected at 125% scaling: bundled branding/icons, dark palette, blue word mode, 0/50 counter, and footer rendered correctly. Synthetic input attempts did not establish native counter/click behavior, so those runtime checks remain unverified; counter boundaries, mistakes, Backspace, and terminal completion are covered by automated tests. Native Windows, native Wayland, browser handoff, IME, and physical input remain unverified for this follow-up. No score page or packaged release was added.

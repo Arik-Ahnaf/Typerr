@@ -11,6 +11,7 @@ fn main() -> iced::Result {
                 .as_slice(),
         )
         .default_font(ui::theme::FONT)
+        .font(include_bytes!("../assets/fonts/Jomhuria/Jomhuria-Regular.ttf").as_slice())
         .window(iced::window::Settings {
             size: iced::Size::new(700.0, 400.0),
             min_size: Some(iced::Size::new(700.0, 400.0)),

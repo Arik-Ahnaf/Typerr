@@ -15,14 +15,14 @@ Build separately on native Windows and Arch Linux. A successful build on one tar
 
 Use `typerr-0.1.0-windows-x86_64.zip` and `typerr-0.1.0-arch-linux-x86_64.tar.gz` as proposed names only after the actual build architecture has been verified. Do not label an artifact with an architecture or platform it was not built and checked for.
 
-The font and English word list are embedded in the executable. The program must launch from an unrelated working directory without accessing repository assets. Include third-party license notices even when the assets themselves are embedded.
+Both fonts (Google Sans Code and Jomhuria), SVG icons, and the English word list are embedded in the executable. The program must launch from an unrelated working directory without accessing repository assets. Include third-party license notices even when the assets themselves are embedded.
 
 ## Required inputs and tools
 
 - The pinned Rust toolchain and locked dependency graph described in `BUILD.md`.
 - Native build/linker tools and actual renderer/windowing runtime dependencies for the target platform.
 - Platform archive tools for ZIP or tar/gzip creation, to be selected and verified when packaging is implemented.
-- The existing Google Sans Code `OFL.txt` and copyright notice. Preserve the font's license when distributing it inside the executable.
+- The Google Sans Code and Jomhuria `OFL.txt` files and copyright notices. Preserve the font's license when distributing it inside the executable.
 - Provenance for the project's originally curated English word list; do not copy another project's list without checking and including its applicable license.
 - A record of relevant dependency notices and verified runtime requirements for each artifact.
 
