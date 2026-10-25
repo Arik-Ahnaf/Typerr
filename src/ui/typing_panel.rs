@@ -8,7 +8,7 @@ use iced::{Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, alig
 use std::time::Instant;
 use typerr::{
     engine::{CharacterState, TypingSession},
-    layout::{TextLayout, Viewport},
+    layout::{CaretTarget, TextLayout, Viewport},
 };
 
 type NativeParagraph = <Renderer as text::Renderer>::Paragraph;
@@ -16,6 +16,7 @@ type NativeParagraph = <Renderer as text::Renderer>::Paragraph;
 pub struct TypingPanel<'a, Message> {
     session: &'a TypingSession,
     revision: u64,
+    generation: u64,
     monitor: String,
     next_tick: Option<Instant>,
     on_event: fn(Event) -> Message,
@@ -29,9 +30,81 @@ struct State {
     viewport: Viewport,
     size: Size,
     revision: u64,
+    generation: u64,
     caret: Caret,
+    manually_scrolled: bool,
+    unfocused: bool,
     wheel_remainder: f32,
     font_size: f32,
+}
+
+impl State {
+    fn content_origin(&self) -> CaretTarget {
+        let measured = self.layout.as_ref().expect("layout was initialized");
+        let offset = self.viewport.content_origin(
+            measured,
+            (self.size.width - 2.0 * theme::INSET).max(0.0),
+            (self.size.height - 2.0 * theme::VERTICAL_INSET).max(0.0),
+        );
+        CaretTarget {
+            x: theme::INSET + offset.x,
+            y: theme::VERTICAL_INSET + offset.y,
+        }
+    }
+
+    fn caret_target(&self, position: usize) -> CaretTarget {
+        let measured = self.layout.as_ref().expect("layout was initialized");
+        let target = measured.caret(position);
+        let origin = self.content_origin();
+        CaretTarget {
+            x: origin.x + target.x,
+            y: origin.y + target.y - self.viewport.top_line as f32 * measured.line_height,
+        }
+    }
+
+    fn sync_caret(
+        &mut self,
+        position: usize,
+        revision: u64,
+        generation: u64,
+        geometry_changed: bool,
+        now: Instant,
+    ) {
+        let reset = geometry_changed || self.generation != generation;
+        let edited = self.revision != revision;
+        if !reset && !edited {
+            return;
+        }
+        let snap = reset || self.manually_scrolled || self.unfocused;
+        self.follow(position);
+        let target = self.caret_target(position);
+        if snap {
+            self.caret.snap_to(target);
+        } else {
+            self.caret.retarget(target, now);
+        }
+        self.revision = revision;
+        self.generation = generation;
+    }
+
+    fn follow(&mut self, position: usize) {
+        if let Some(measured) = &self.layout {
+            self.viewport.follow(measured, position);
+        }
+        self.manually_scrolled = false;
+        self.wheel_remainder = 0.0;
+    }
+
+    fn scroll(&mut self, lines: isize, position: usize) {
+        if let Some(measured) = &self.layout {
+            let previous_top = self.viewport.top_line;
+            self.viewport.scroll(lines, measured.lines.len());
+            if self.viewport.top_line != previous_top {
+                self.manually_scrolled = true;
+                self.caret.snap_to(self.caret_target(position));
+            }
+        }
+    }
 }
 
 fn text_definition(
@@ -56,6 +129,7 @@ impl<'a, Message> TypingPanel<'a, Message> {
     pub fn new(
         session: &'a TypingSession,
         revision: u64,
+        generation: u64,
         monitor: String,
         next_tick: Option<Instant>,
         on_event: fn(Event) -> Message,
@@ -64,10 +138,54 @@ impl<'a, Message> TypingPanel<'a, Message> {
         Self {
             session,
             revision,
+            generation,
             monitor,
             next_tick,
             on_event,
             settings,
+        }
+    }
+
+    fn window_event(
+        &self,
+        state: &mut State,
+        event: &iced::window::Event,
+        shell: &mut Shell<'_, Message>,
+    ) {
+        use iced::window::Event;
+        match event {
+            Event::RedrawRequested(now) => {
+                if state.caret.advance(*now) {
+                    shell.request_redraw();
+                }
+                // The shell retains the earliest request: animation frames and
+                // countdown seconds share scheduling without restarting either.
+                if let Some(next_tick) = self.next_tick {
+                    if *now >= next_tick {
+                        shell.publish((self.on_event)(iced::Event::Window(event.clone())));
+                    } else {
+                        shell.request_redraw_at(next_tick);
+                    }
+                }
+            }
+            Event::Unfocused => {
+                state.unfocused = true;
+                state.caret.snap_to(state.caret.target);
+                shell.request_redraw();
+            }
+            Event::Focused => state.unfocused = false,
+            Event::Resized(_) | Event::Rescaled(_) => {
+                // A window resize can leave a capped panel's size unchanged.
+                // It must still end inspection/motion and restore active following.
+                state.follow(self.session.position());
+                if state.layout.is_some() {
+                    state
+                        .caret
+                        .snap_to(state.caret_target(self.session.position()));
+                }
+                shell.request_redraw();
+            }
+            _ => {}
         }
     }
 }
@@ -94,6 +212,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         let resized = state.layout.is_none()
             || state.size != size
             || state.target != self.session.target()
+            || state.generation != self.generation
             || state.font_size != self.settings.font_size;
         if resized {
             // Query the renderer's paragraph implementation after startup font registration.
@@ -120,13 +239,13 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             state.size = size;
             state.font_size = self.settings.font_size;
         }
-        let measured = state.layout.as_ref().expect("layout was initialized");
-        if state.revision != self.revision {
-            state.viewport.follow(measured, self.session.position());
-            state.revision = self.revision;
-            state.wheel_remainder = 0.0;
-        }
-        state.caret.snap_to(measured.caret(self.session.position()));
+        state.sync_caret(
+            self.session.position(),
+            self.revision,
+            self.generation,
+            resized,
+            Instant::now(),
+        );
         layout::Node::new(size)
     }
 
@@ -141,16 +260,8 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
-        // Schedule only the next displayed second. Derive elapsed time from the
-        // monotonic deadline so delayed redraws never slow down the countdown.
-        if let Event::Window(iced::window::Event::RedrawRequested(now)) = event
-            && let Some(next_tick) = self.next_tick
-        {
-            if *now >= next_tick {
-                shell.publish((self.on_event)(event.clone()));
-            } else {
-                shell.request_redraw_at(next_tick);
-            }
+        if let Event::Window(event) = event {
+            self.window_event(tree.state.downcast_mut::<State>(), event, shell);
         }
         // Keyboard input must not cross the bounded asynchronous event-subscription
         // queue: a busy frame can otherwise drop a burst of native keystrokes.
@@ -177,11 +288,9 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             state.wheel_remainder += amount;
             let lines = state.wheel_remainder.trunc() as isize;
             state.wheel_remainder -= lines as f32;
-            if let Some(measured) = &state.layout {
-                state.viewport.scroll(lines, measured.lines.len());
-                shell.request_redraw();
-                shell.capture_event();
-            }
+            state.scroll(lines, self.session.position());
+            shell.request_redraw();
+            shell.capture_event();
         }
     }
 
@@ -204,13 +313,8 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         };
         let inner_width = (bounds.width - 2.0 * theme::INSET).max(0.0);
         let inner_height = (bounds.height - 2.0 * theme::VERTICAL_INSET).max(0.0);
-        let offset = state
-            .viewport
-            .content_origin(measured, inner_width, inner_height);
-        let origin = Point::new(
-            bounds.x + theme::INSET + offset.x,
-            bounds.y + theme::VERTICAL_INSET + offset.y,
-        );
+        let offset = state.content_origin();
+        let origin = Point::new(bounds.x + offset.x, bounds.y + offset.y);
         // Keep the monitor aligned with the measured, centered text block,
         // including when only the final line remains or the window reflows.
         renderer.fill_text(
@@ -227,7 +331,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         let clip = Rectangle {
             x: origin.x,
             y: origin.y,
-            width: (inner_width - offset.x).max(0.0),
+            width: (bounds.width - theme::INSET - offset.x).max(0.0),
             height: state.viewport.visible_lines(measured.lines.len()).len() as f32
                 * self.settings.line_height(),
         };
@@ -283,18 +387,27 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
                     }
                 }
             }
-            if state
-                .viewport
-                .visible_lines(measured.lines.len())
-                .contains(&active)
-            {
+        });
+        if state
+            .viewport
+            .visible_lines(measured.lines.len())
+            .contains(&active)
+        {
+            // Retain the whole padded panel during a return movement, even if
+            // the newly centered text block is narrower than the previous one.
+            let caret_clip = Rectangle {
+                x: bounds.x + theme::INSET,
+                y: bounds.y + theme::VERTICAL_INSET,
+                width: inner_width,
+                height: inner_height,
+            };
+            renderer.with_layer(caret_clip, |renderer| {
                 let caret = state.caret.rendered;
                 renderer.fill_quad(
                     renderer::Quad {
                         bounds: Rectangle {
-                            x: origin.x + caret.x,
-                            y: origin.y + caret.y
-                                - state.viewport.top_line as f32 * self.settings.line_height(),
+                            x: bounds.x + caret.x,
+                            y: bounds.y + caret.y,
                             width: 2.0,
                             height: self.settings.line_height(),
                         },
@@ -302,13 +415,233 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
                     },
                     theme::CYAN,
                 );
-            }
-        });
+            });
+        }
     }
 }
 
 impl<'a, Message: 'a> From<TypingPanel<'a, Message>> for Element<'a, Message> {
     fn from(panel: TypingPanel<'a, Message>) -> Self {
         Self::new(panel)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use iced::window::{Event as WindowEvent, RedrawRequest};
+    use std::time::Duration;
+
+    const MOVEMENT: Duration = Duration::from_millis(100);
+
+    fn geometry(state: &mut State, session: &TypingSession, size: Size, font_size: f32) {
+        // Synthetic measured metrics; production still obtains these from Iced.
+        let measured = TextLayout::new(session.target(), size.width - 40.0, 10.0, font_size * 1.25);
+        state
+            .viewport
+            .resize(&measured, size.height - 30.0, session.position());
+        state.layout = Some(measured);
+        state.target = session.target().to_vec();
+        state.size = size;
+        state.font_size = font_size;
+    }
+
+    fn state(session: &TypingSession, now: Instant) -> State {
+        let mut state = State::default();
+        geometry(&mut state, session, Size::new(122.0, 110.0), 16.0);
+        state.sync_caret(session.position(), 0, 0, true, now);
+        state
+    }
+
+    fn panel(session: &TypingSession, next_tick: Option<Instant>) -> TypingPanel<'_, Event> {
+        TypingPanel::new(
+            session,
+            0,
+            0,
+            String::new(),
+            next_tick,
+            |event| event,
+            Default::default(),
+        )
+    }
+
+    #[test]
+    fn wraps_and_backspace_animate_in_panel_coordinates_after_recentering() {
+        let now = Instant::now();
+        let mut session = TypingSession::new("one two three");
+        let mut state = state(&session, now);
+        for c in "one two".chars() {
+            session.input(c);
+        }
+        state.sync_caret(session.position(), 1, 0, false, now);
+        state.caret.advance(now + MOVEMENT);
+        let before = state.caret.rendered;
+        assert_eq!(before, CaretTarget { x: 90.0, y: 35.0 });
+        session.input('x'); // A wrong separator has the same wrapping behavior.
+        state.sync_caret(session.position(), 2, 0, false, now + MOVEMENT);
+        assert_eq!(state.viewport.top_line, 1);
+        assert_eq!(state.caret.rendered, before);
+        assert_eq!(state.caret.target, CaretTarget { x: 35.0, y: 45.0 });
+        assert!(state.caret.advance(now + MOVEMENT + MOVEMENT / 2));
+        assert_eq!(state.caret.rendered, CaretTarget { x: 62.5, y: 40.0 });
+        state.caret.advance(now + MOVEMENT * 2);
+        assert!(session.backspace());
+        state.sync_caret(session.position(), 3, 0, false, now + MOVEMENT * 2);
+        assert_eq!(state.viewport.top_line, 0);
+        assert_eq!(state.caret.target, before);
+        assert!(state.caret.advance(now + MOVEMENT * 2 + MOVEMENT / 2));
+        assert_eq!(state.caret.rendered, CaretTarget { x: 62.5, y: 40.0 });
+        assert!(!state.caret.advance(now + MOVEMENT * 3));
+        assert_eq!(state.caret.rendered, before);
+    }
+
+    #[test]
+    fn identical_text_reset_and_reflow_cancel_in_flight_movement() {
+        let now = Instant::now();
+        let session = TypingSession::new("one two three");
+        let mut state = state(&session, now);
+        state.sync_caret(5, 1, 0, false, now);
+        state.sync_caret(0, 2, 1, false, now + MOVEMENT / 2);
+        assert_eq!(state.target, session.target());
+        assert_eq!(state.caret.rendered, state.caret_target(0));
+        assert!(!state.caret.advance(now + MOVEMENT));
+        for (size, font_size) in [
+            (Size::new(142.0, 110.0), 16.0),
+            (Size::new(142.0, 150.0), 24.0),
+        ] {
+            state.sync_caret(6, state.revision + 1, 1, false, now);
+            geometry(&mut state, &session, size, font_size);
+            state.sync_caret(6, state.revision, 1, true, now + MOVEMENT / 2);
+            assert_eq!(state.caret.rendered, state.caret_target(6));
+            assert!(!state.caret.advance(now + MOVEMENT));
+        }
+    }
+
+    #[test]
+    fn inspection_and_noops_preserve_viewport_until_an_accepted_edit() {
+        let now = Instant::now();
+        let session = TypingSession::new("one two three four five six seven eight nine ten");
+        let mut state = state(&session, now);
+        state.sync_caret(2, 1, 0, false, now);
+        state.scroll(2, 2);
+        assert_eq!(state.viewport.top_line, 2);
+        assert!(state.manually_scrolled);
+        assert!(!state.caret.advance(now + MOVEMENT / 2));
+        let measured = state.layout.as_ref().unwrap();
+        assert!(
+            !state
+                .viewport
+                .visible_lines(measured.lines.len())
+                .contains(&measured.active_line(2))
+        );
+        state.sync_caret(2, 1, 0, false, now + MOVEMENT);
+        assert_eq!(state.viewport.top_line, 2);
+        state.sync_caret(3, 2, 0, false, now + MOVEMENT);
+        assert_eq!(state.viewport.top_line, 0);
+        assert_eq!(state.caret.rendered, state.caret_target(3));
+        assert!(!state.caret.advance(now + MOVEMENT));
+        state.sync_caret(4, 3, 0, false, now + MOVEMENT);
+        assert!(state.caret.advance(now + MOVEMENT + MOVEMENT / 2));
+    }
+
+    #[test]
+    fn countdown_and_animation_share_redraws_without_editing_or_prolonging_motion() {
+        let now = Instant::now();
+        let deadline = now + Duration::from_secs(1);
+        let session = TypingSession::new("one two three four five six seven");
+        let mut state = state(&session, now);
+        state.sync_caret(1, 1, 0, false, now);
+        let timed_panel = panel(&session, Some(deadline));
+        let mut messages = Vec::new();
+        let mut shell = Shell::new(&mut messages);
+        timed_panel.window_event(
+            &mut state,
+            &WindowEvent::RedrawRequested(now + MOVEMENT / 2),
+            &mut shell,
+        );
+        assert_eq!(shell.redraw_request(), RedrawRequest::NextFrame);
+        assert!(shell.is_empty());
+        // An unchanged view, including a countdown refresh, must not restart it.
+        state.sync_caret(1, 1, 0, false, now + MOVEMENT / 2);
+        let mut shell = Shell::new(&mut messages);
+        timed_panel.window_event(
+            &mut state,
+            &WindowEvent::RedrawRequested(now + MOVEMENT),
+            &mut shell,
+        );
+        assert_eq!(shell.redraw_request(), RedrawRequest::At(deadline));
+        assert_eq!(state.caret.rendered, state.caret.target);
+        state.scroll(1, 1);
+        let mut shell = Shell::new(&mut messages);
+        timed_panel.window_event(
+            &mut state,
+            &WindowEvent::RedrawRequested(deadline),
+            &mut shell,
+        );
+        assert_eq!(shell.redraw_request(), RedrawRequest::Wait);
+        assert_eq!(
+            messages,
+            [Event::Window(WindowEvent::RedrawRequested(deadline))]
+        );
+        assert_eq!(state.revision, 1);
+        assert_eq!(state.viewport.top_line, 1);
+        let mut shell = Shell::new(&mut messages);
+        panel(&session, None).window_event(
+            &mut state,
+            &WindowEvent::RedrawRequested(deadline + MOVEMENT),
+            &mut shell,
+        );
+        assert_eq!(shell.redraw_request(), RedrawRequest::Wait);
+    }
+
+    #[test]
+    fn focus_loss_and_window_resize_settle_without_waiting_for_animation() {
+        let now = Instant::now();
+        let session = TypingSession::new("one two three four five six seven");
+        let mut state = state(&session, now);
+        let panel = panel(&session, Some(now + Duration::from_secs(1)));
+        let mut messages = Vec::new();
+        let mut shell = Shell::new(&mut messages);
+        state.sync_caret(2, 1, 0, false, now);
+        panel.window_event(&mut state, &WindowEvent::Unfocused, &mut shell);
+        assert_eq!(state.caret.rendered, state.caret.target);
+        assert!(!state.caret.advance(now + MOVEMENT / 2));
+        // Pending edits delivered with focus loss must not start new animation.
+        state.sync_caret(3, 2, 0, false, now);
+        assert!(!state.caret.advance(now + MOVEMENT / 2));
+        panel.window_event(&mut state, &WindowEvent::Focused, &mut shell);
+        state.sync_caret(4, 3, 0, false, now);
+        assert!(state.caret.advance(now + MOVEMENT / 2));
+        state.scroll(2, 4);
+        panel.window_event(
+            &mut state,
+            &WindowEvent::Resized(Size::new(1000.0, 600.0)),
+            &mut shell,
+        );
+        assert_eq!(state.viewport.top_line, 0);
+        assert!(!state.manually_scrolled);
+        assert!(!state.caret.advance(now + MOVEMENT));
+    }
+
+    #[test]
+    fn terminal_movement_finishes_and_ignored_edits_leave_inspection_intact() {
+        let now = Instant::now();
+        let mut session = TypingSession::new("one two three");
+        let mut state = state(&session, now);
+        for c in "one two three".chars() {
+            session.input(c);
+        }
+        state.sync_caret(session.position(), 1, 0, false, now);
+        assert!(state.caret.advance(now + MOVEMENT / 2));
+        assert!(!session.input('a'));
+        assert!(!session.backspace());
+        state.sync_caret(session.position(), 1, 0, false, now + MOVEMENT / 2);
+        assert!(!state.caret.advance(now + MOVEMENT));
+        assert_eq!(state.caret.rendered, CaretTarget { x: 85.0, y: 45.0 });
+        state.scroll(-1, session.position());
+        assert!(!session.input('a'));
+        state.sync_caret(session.position(), 1, 0, false, now + MOVEMENT * 2);
+        assert_eq!(state.viewport.top_line, 0);
+        assert_eq!(state.caret.rendered, state.caret_target(session.position()));
     }
 }

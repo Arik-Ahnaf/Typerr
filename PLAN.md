@@ -4,7 +4,7 @@
 
 Current target: **Alpha 0.1**, crate version `0.1.0`.
 
-Deliver a native Rust/Iced Main Typing page with 500 randomly selected English words per mode, responsive reflow, immediate input, expected-glyph error highlighting, Backspace, terminal completion, and a caret architecture ready for future animation.
+Deliver a native Rust/Iced Main Typing page with 500 randomly selected English words per mode, responsive reflow, immediate input, expected-glyph error highlighting, Backspace, terminal completion, and smooth 100 ms caret movement.
 
 The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. Score and other pages remain excluded.
 
@@ -35,7 +35,7 @@ The implementation agent must read all four guides first. The coordinating agent
    - [x] Implement pure wrapping and shared glyph/caret coordinates, including separator ownership.
    - [x] Implement active-line-at-top advancement, whole-line clipping, conditional 50% preview opacity, and manual scrolling.
    - [x] Reflow correctly after resizing and restore the proper line after Backspace.
-   - [x] Keep rendered caret coordinates independent and snap them for this alpha.
+   - [x] Keep rendered caret coordinates independent; the smooth-caret follow-up now animates them over 100 ms.
 4. **Native GUI and input**
    - [x] Open a 700 × 400 window with the same minimum size.
    - [x] Render the in-scope Figma panel, colors, and embedded font.
@@ -62,6 +62,7 @@ The implementation agent must read all four guides first. The coordinating agent
 - Wheel scrolling permits inspection; accepted typing, successful Backspace, and resize restore the active line at the top.
 - The final input completes the session with no dialog, page change, or automatic restart. An unmodified Tab keypress explicitly starts a fresh 500-word race in the current mode at any time, including after completion. While completed, further typing and Backspace are ignored until Tab restarts. The final line remains visible instead of advancing to an empty row; wheel inspection remains possible.
 - The engine has no Iced dependency, and logical progress is independent from rendered caret coordinates.
+- The caret uses always-on 100 ms `inOut(1.25)` movement, including line returns and Backspace. Rapid input retargets from the current interpolated position; resets, reflow, and focus loss cancel movement immediately. Animation and countdown redraws preserve manual inspection and edit revisions.
 - Embedded assets work when the binary is launched outside the repository directory.
 - Tests and verification evidence support the claimed behavior; Windows and Arch runtime status are separately qualified.
 
@@ -97,7 +98,7 @@ The word list contains exactly 200 original curated words. Keyboard/focus events
 
 - Arch Linux release launch and the native XWayland checks above passed. Native Wayland and Windows build/runtime verification remain pending.
 - Alpha 0.1 uses a monospaced ASCII English target. Full IME/composition, international word sets, and advanced Unicode shaping are future work unless separately verified.
-- Smooth caret interpolation, configurable easing/duration, and animated line transitions are deferred; retain the independent target/rendered coordinate boundary now.
+- Smooth caret interpolation and line returns are implemented. User-configurable movement, blinking, and animated text scrolling remain future work; duration/easing are centralized for later adjustments.
 - Score, Dashboard, Settings, configurable durations, and on-screen restart controls require later version plans.
 - Installer creation, distribution automation, signing, and publication remain unimplemented; see `PACKAGING.md`.
 
@@ -189,3 +190,13 @@ Validation: formatting, strict Clippy, all 26 automated tests (14 library, 10 ap
 Removed the fixed 110px panel height cap. Panel height now fits four configured line heights plus 30px inner padding, rounded upward for fractional sizes. At 24px the panel is 150px high and still fits a 700 × 400 window. Larger fonts increase startup/minimum window height as needed to retain the existing exterior clearance; 48px uses 520px window height. Settings are loaded once and shared between startup geometry and app state. The user's 24px setting was preserved.
 
 Validation: formatting, strict Clippy, all 29 tests, locked debug/release builds, and `git diff --check` passed. A regression test checks four whole viewport rows and minimum-window space at 4,001 font sizes from 8–48px, including the reported 24px case. No native GUI or Windows check was performed; existing platform limitations and next-alpha scope remain unchanged.
+
+## Smooth caret movement — 2026-10-25
+
+- Read Monkeytype's official [`test/caret.ts`](https://github.com/monkeytypegame/monkeytype/blob/master/frontend/src/ts/test/caret.ts) and delegated [`elements/caret.ts`](https://github.com/monkeytypegame/monkeytype/blob/master/frontend/src/ts/elements/caret.ts) before implementation. Adopted its medium 100 ms duration and `inOut(1.25)` power easing in native Rust; no JavaScript runtime or animation dependency was added.
+- Caret state holds panel-relative start, rendered, and target positions with an injected monotonic timestamp. New edits sample the current movement before retargeting; unchanged layout does not restart it. Native redraws advance only presentation state and stop scheduling animation frames at the exact target.
+- Shared measured geometry supplies glyphs and caret destinations. Immediate text scrolling/recentering is retained, with smooth caret returns across wraps in both directions. Separate clipping keeps the moving caret within the padded panel without restricting it to the new text origin.
+- A separate generation counter distinguishes session resets even for identical target text. Startup, Tab/mode/toggle resets, geometry changes, focus loss, wheel inspection, and the first accepted edit after inspection settle immediately. Terminal completion lets its final movement finish; ignored input preserves inspection. Window resize/scale events restore following even when a capped panel's size is unchanged.
+- Preserved the engine/layout interfaces, synchronous keyboard delivery, countdown semantics, crate version `0.1.0`, solid cyan caret, and the user's 24px setting. No new configuration, controls, dependencies, packaging, push, or publication.
+- Validation: all 41 tests passed (14 library, 25 binary, 2 integration), including 12 new animation/presentation/input tests. Formatting, strict Clippy, locked debug/release builds, and whitespace review are recorded in `BUILD.md`.
+- Native Arch/XWayland captures at 125% scale and 16px/24px fonts recorded intermediate movement, rapid retargeting, forward/backward wraps, restart during movement, resize, and terminal completion. Matching Backspaces restored the exact initial caret after rapid input and 100-event bursts; completed-window pixels were unchanged by further input/Backspace. Native wheel/focus interactions, Windows, native Wayland, physical held-key repeat, and IME remain unverified for this follow-up; deterministic tests cover wheel/focus/countdown policy.

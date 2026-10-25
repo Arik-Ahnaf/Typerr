@@ -31,6 +31,8 @@ struct MainTyping {
     seconds_remaining: u64,
     /// Changes on accepted edits or explicit session resets, restoring the viewport.
     revision: u64,
+    /// Changes only when a session is replaced, even if its text is identical.
+    generation: u64,
 }
 
 impl MainTyping {
@@ -39,6 +41,7 @@ impl MainTyping {
         self.deadline = None;
         self.seconds_remaining = TIME_LIMIT_SECONDS;
         self.revision = self.revision.wrapping_add(1);
+        self.generation = self.generation.wrapping_add(1);
     }
 
     fn tick(&mut self, now: Instant) {
@@ -89,6 +92,7 @@ impl Default for App {
                 deadline: None,
                 seconds_remaining: TIME_LIMIT_SECONDS,
                 revision: 0,
+                generation: 0,
             },
             focused: true,
             settings: crate::settings::Settings::default(),
@@ -172,6 +176,7 @@ impl App {
         let panel = container(TypingPanel::new(
             &self.main.session,
             self.main.revision,
+            self.main.generation,
             self.main.monitor(),
             self.main.next_tick(),
             Message::Native,
@@ -249,9 +254,46 @@ mod tests {
                 deadline: None,
                 seconds_remaining: TIME_LIMIT_SECONDS,
                 revision: 0,
+                generation: 0,
             },
             focused: true,
             settings: crate::settings::Settings::default(),
+        }
+    }
+
+    #[test]
+    fn burst_edits_preserve_generation_and_only_session_resets_change_it() {
+        let mut app = app(&"a".repeat(2000));
+        for _ in 0..1000 {
+            app.update(key(
+                Key::Character("a".into()),
+                Some("a"),
+                Modifiers::empty(),
+            ));
+        }
+        assert_eq!(app.main.session.position(), 1000);
+        assert_eq!(app.main.generation, 0);
+        for _ in 0..1000 {
+            app.update(key(Key::Named(Named::Backspace), None, Modifiers::empty()));
+        }
+        assert_eq!(app.main.session.position(), 0);
+        assert_eq!(app.main.generation, 0);
+        for (index, message) in [
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            Message::SelectMode(Mode::Time),
+            Message::TogglePunctuation,
+            Message::ToggleNumbers,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            app.update(message);
+            assert_eq!(app.main.generation, index as u64 + 1);
+            let generation = app.main.generation;
+            app.update(Message::SelectMode(app.main.mode));
+            app.update(key(Key::Named(Named::Backspace), None, Modifiers::empty()));
+            tick(&mut app, Instant::now());
+            assert_eq!(app.main.generation, generation);
         }
     }
 

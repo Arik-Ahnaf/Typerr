@@ -2,7 +2,7 @@
 
 ## Vision and current boundary
 
-Typerr is a native Rust typing application inspired by Monkeytype. Responsive input, accurate text layout, and eventually smooth caret movement take priority over feature count. Target platforms are Windows and Arch Linux. Develop through small, independently testable alpha versions.
+Typerr is a native Rust typing application inspired by Monkeytype. Responsive input, accurate text layout, and smooth caret movement take priority over feature count. Target platforms are Windows and Arch Linux. Develop through small, independently testable alpha versions.
 
 The current typing-page follow-up (`0.1.0`) contains the Main Typing page with Words and Time modes, each generating 500 words. Words is the startup mode, with a 50-word displayed target independent of the 500-word buffer. The counter caps at `50/50`; reaching 50 does not stop input or navigate. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the blue accent. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a 30-second countdown, starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and stays at `0s` after expiry without stopping input or navigating. Do not implement Score, Dashboard, Settings, on-screen restart controls, writing settings, or application networking. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
 
@@ -30,12 +30,14 @@ Keep modules small and cohesive. The initial structure is:
 | `src/layout.rs` | Pure measured-cell wrapping, visual lines, character/caret positions, and separator ownership; no Iced dependency |
 | `src/app.rs` | Application state, native events, focus/input policy, mode/countdown/generation-option state, and Main Typing page composition |
 | `src/ui/typing_panel.rs` | Native widget, measured font metrics, glyph/error drawing, viewport, clipping, and scroll interaction |
-| `src/ui/caret.rs` | Rendered caret coordinates separate from logical input position and layout target |
+| `src/ui/caret.rs` | Monotonic caret animation and panel-relative presentation coordinates, separate from logical input and measured layout |
 | `src/ui/theme.rs` | Centralized visual dimensions, font, and colors |
 
 The implementation also uses `tests/session_layout.rs` to exercise engine/layout/viewport boundaries together. The Main Typing page owns an edit revision that changes only after successful input, Backspace, an explicit Tab restart, a mode change, or a generation-option toggle; the widget uses it to restore automatic following without disturbing manual inspection after no-op events. Countdown redraws do not change the edit revision or reset manual scrolling. The widget schedules the next countdown second with `Shell::request_redraw_at` and forwards due redraw timestamps to the page; no async keyboard subscription or extra timer dependency is used. Widget tree state retains viewport and caret presentation state across views. The widget forwards keyboard and window-focus events synchronously with `Shell::publish`; do not route typing through `iced::event::listen`, whose bounded asynchronous queue dropped keystrokes during a native burst-input check.
 
 Small adjustments to this structure are acceptable when documented, but preserve the engine/layout/UI boundaries. Pure layout takes measured cell advance and geometry as inputs; it does not create Iced paragraphs itself. Text, error markers, and the caret must use the same layout result.
+
+The page also owns a session-generation counter, incremented only when replacing a session; do not infer resets from text equality or logical position. Caret animation uses native redraw timestamps and requests another frame only while moving. These frames do not publish typing edits, change revisions, or rebuild measured layout. Countdown deadlines and movement share the shell's earliest-redraw scheduling.
 
 ## Typing invariants
 
@@ -59,7 +61,9 @@ Small adjustments to this structure are acceptable when documented, but preserve
 - Wheel scrolling temporarily permits inspecting previous or later text in whole-line increments. The next accepted input, successful Backspace, or resize restores the active line to the top. No-op input leaves manual inspection unchanged.
 - On resize, recompute wrapping from the same logical position. Backspace across a wrap restores the preceding active line to the top.
 - At completion, retain the final character's line as the terminal anchor and place the caret after its last glyph. Do not scroll to an empty sentinel line. Manual scrolling remains available after completion.
-- Keep logical position in the engine, target caret coordinates in the layout result, and rendered coordinates in UI state. Alpha 0.1 snaps the rendered caret to its target. Later easing, duration, frame scheduling, and line-transition policy must be addable without changing typing rules or wrapping.
+- Keep logical position in the engine, target caret coordinates in the layout result, and rendered coordinates in UI state. Movement is always enabled at 100 ms with power `inOut(1.25)` easing, centralized in `src/ui/caret.rs`. Retarget from the current interpolated position without queuing obsolete movements or restarting on unchanged targets.
+- Animate panel-relative coordinates derived from the shared measured layout and centered origin, including forward/backward line crossings; text scrolling remains immediate. Clip the caret to the padded panel separately from the text block so recentering cannot hide its return movement.
+- Snap on startup, session replacement, resize/reflow, font-metric changes, and focus loss. Wheel inspection cancels motion and positions the caret against inspected text; hide it if its active line is outside the viewport. The first accepted edit after inspection snaps back to automatic following; later edits animate. Completion lets the final movement settle. Keep the solid caret style; do not add blink behavior or a motion setting without authorization.
 
 ## Visual reference
 
