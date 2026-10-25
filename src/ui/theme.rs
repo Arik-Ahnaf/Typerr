@@ -6,5 +6,7 @@ pub const FONT_SIZE: f32 = 16.0;
 pub const LINE_HEIGHT: f32 = 20.0;
 pub const INSET: f32 = 20.0;
 pub const VERTICAL_INSET: f32 = 15.0;
+pub const TYPING_MAX_WIDTH: f32 = 700.0;
+pub const TYPING_MAX_HEIGHT: f32 = 4.0 * LINE_HEIGHT + 2.0 * VERTICAL_INSET;
 // Cargo validates the JSON and compiles its role mappings into native colors.
 include!(concat!(env!("OUT_DIR"), "/dracula.rs"));

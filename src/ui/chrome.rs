@@ -1,8 +1,9 @@
 //! Native page chrome; all artwork is compiled into the executable.
 use super::theme;
-use crate::app::Message;
+use crate::app::{Message, Mode};
 use iced::widget::{Space, button, container, row, svg, text};
 use iced::{Element, Fill, Font};
+use typerr::words;
 
 fn icon(bytes: &'static [u8], width: f32, height: f32) -> svg::Svg<'static> {
     svg(svg::Handle::from_memory(bytes))
@@ -13,13 +14,17 @@ fn icon(bytes: &'static [u8], width: f32, height: f32) -> svg::Svg<'static> {
         })
 }
 
-fn control(bytes: &'static [u8], active: bool) -> Element<'static, Message> {
-    // These four controls are intentionally inert until their modes exist.
+fn control(
+    bytes: &'static [u8],
+    active: bool,
+    action: Option<Message>,
+) -> Element<'static, Message> {
     let glyph = icon(bytes, 20.0, 20.0).style(move |_, _| svg::Style {
         color: Some(if active { theme::BLUE } else { theme::CORRECT }),
     });
     button(container(glyph).center_x(35).center_y(30))
         .padding(0)
+        .on_press_maybe(action)
         .style(|_, _| button::Style::default())
         .into()
 }
@@ -38,7 +43,7 @@ fn group(
         .into()
 }
 
-pub fn header() -> Element<'static, Message> {
+pub fn header(mode: Mode, options: words::Options) -> Element<'static, Message> {
     let brand = row![
         container(icon(
             include_bytes!("../../assets/icons/keyboard.svg"),
@@ -54,12 +59,28 @@ pub fn header() -> Element<'static, Message> {
     .spacing(8);
     let controls = row![
         group(
-            control(include_bytes!("../../assets/icons/punctuation.svg"), false),
-            control(include_bytes!("../../assets/icons/Vector-1.svg"), false),
+            control(
+                include_bytes!("../../assets/icons/punctuation.svg"),
+                options.punctuation,
+                Some(Message::TogglePunctuation)
+            ),
+            control(
+                include_bytes!("../../assets/icons/Vector-1.svg"),
+                options.numbers,
+                Some(Message::ToggleNumbers)
+            ),
         ),
         group(
-            control(include_bytes!("../../assets/icons/time-mode.svg"), false),
-            control(include_bytes!("../../assets/icons/word-mode.svg"), true),
+            control(
+                include_bytes!("../../assets/icons/time-mode.svg"),
+                mode == Mode::Time,
+                Some(Message::SelectMode(Mode::Time))
+            ),
+            control(
+                include_bytes!("../../assets/icons/word-mode.svg"),
+                mode == Mode::Words,
+                Some(Message::SelectMode(Mode::Words))
+            ),
         ),
     ]
     .spacing(10);

@@ -5,6 +5,7 @@ use iced::advanced::{
     Clipboard, Layout, Shell, Widget, layout, mouse, renderer, text, widget::tree,
 };
 use iced::{Element, Event, Length, Point, Rectangle, Renderer, Size, Theme, alignment};
+use std::time::Instant;
 use typerr::{
     engine::{CharacterState, TypingSession},
     layout::{TextLayout, Viewport},
@@ -15,6 +16,8 @@ type NativeParagraph = <Renderer as text::Renderer>::Paragraph;
 pub struct TypingPanel<'a, Message> {
     session: &'a TypingSession,
     revision: u64,
+    monitor: String,
+    next_tick: Option<Instant>,
     on_event: fn(Event) -> Message,
 }
 
@@ -44,10 +47,18 @@ fn text_definition(content: &str, bounds: Size) -> text::Text<&str> {
 }
 
 impl<'a, Message> TypingPanel<'a, Message> {
-    pub fn new(session: &'a TypingSession, revision: u64, on_event: fn(Event) -> Message) -> Self {
+    pub fn new(
+        session: &'a TypingSession,
+        revision: u64,
+        monitor: String,
+        next_tick: Option<Instant>,
+        on_event: fn(Event) -> Message,
+    ) -> Self {
         Self {
             session,
             revision,
+            monitor,
+            next_tick,
             on_event,
         }
     }
@@ -118,6 +129,17 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
+        // Schedule only the next displayed second. Derive elapsed time from the
+        // monotonic deadline so delayed redraws never slow down the countdown.
+        if let Event::Window(iced::window::Event::RedrawRequested(now)) = event
+            && let Some(next_tick) = self.next_tick
+        {
+            if *now >= next_tick {
+                shell.publish((self.on_event)(event.clone()));
+            } else {
+                shell.request_redraw_at(next_tick);
+            }
+        }
         // Keyboard input must not cross the bounded asynchronous event-subscription
         // queue: a busy frame can otherwise drop a burst of native keystrokes.
         if matches!(
@@ -179,14 +201,9 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         );
         // Keep the monitor aligned with the measured, centered text block,
         // including when only the final line remains or the window reflows.
-        let counter = format!(
-            "{}/{}",
-            self.session.completed_words(),
-            self.session.word_count()
-        );
         renderer.fill_text(
-            text_definition(&counter, Size::new(inner_width, theme::LINE_HEIGHT))
-                .with_content(counter.clone()),
+            text_definition(&self.monitor, Size::new(inner_width, theme::LINE_HEIGHT))
+                .with_content(self.monitor.clone()),
             Point::new(origin.x, origin.y - 30.0),
             theme::BLUE,
             *_viewport,

@@ -80,7 +80,7 @@ Windows compilation, runtime behavior, display scaling, keyboard input, and pack
 | Toolchain installation command | Passed on Arch Linux x86_64 |
 | `cargo fmt --all -- --check` for Alpha 0.1 | Passed |
 | `CARGO_BUILD_JOBS=2 cargo clippy --locked --all-targets -- -D warnings` | Passed without warnings |
-| Automated tests | Passed: 18 tests including engine, layout, generation, input policy, and integration |
+| Automated tests | Passed: 26 tests including engine, layout, generation, input/mode/timer policy, and integration |
 | Development build | Passed on Arch Linux x86_64 |
 | `CARGO_BUILD_JOBS=2 cargo build --locked --release` | Passed on Arch Linux x86_64 |
 | Native Arch GUI and visual review | Passed the XWayland checks below at 125% desktop scaling |
@@ -129,3 +129,31 @@ Validation completed on 2026-10-25: formatting, strict Clippy, all 19 automated 
 `build.rs` reads `themes/dracula.json`, validates `#RRGGBB` colors and role references with build-only `serde_json`, and generates color constants under Cargo's `OUT_DIR`. Cargo rebuilds when the JSON changes. The executable includes the resulting colors and theme name; no external theme file is needed at runtime. Unknown role references or malformed colors fail the build.
 
 Validation: formatting, strict Clippy, all 19 existing automated tests, and locked debug/release builds passed on Arch Linux. An isolated build-script check confirmed that changed JSON colors propagate to generated constants, while malformed hex and unknown color references fail. The source JSON was unchanged by those checks. No new native GUI or Windows verification was performed for this palette-only change.
+
+## Typing area maximum width — 2026-10-25
+
+The typing panel now stays horizontally centered and grows to at most 700 logical pixels wide, including its inner padding. Smaller windows retain the 30px exterior margins (640px panel at the 700px minimum window width). Height and measured text wrapping retain their existing behavior.
+
+Validation: formatting, strict Clippy, all 19 automated tests, and locked debug/release builds passed on Arch Linux. No new GUI screenshot or native Windows verification was performed for this change. Existing platform limitations and planned next-alpha work remain unchanged.
+
+### Words and Time modes — 2026-10-25
+
+Both modes generate 500 words. The countdown uses `std::time::Instant` and native scheduled redraws, adding no dependencies. Keyboard/focus delivery remains synchronous.
+
+Validation: formatting, strict Clippy, all 22 automated tests (13 library, 7 app policy, 2 integration), and locked debug/release builds passed on Arch Linux. The new tests cover 500-word generation, mode changes and active-mode no-ops, Tab resets, countdown startup and elapsed-time catch-up, focus loss, expiry, and continued editing after zero. `git diff --check` passed.
+
+Native XWayland at 125% scaling: launched the debug executable outside the checkout and inspected `0/500`, Time mode's blue clock icon and `30s` monitor, automatic countdown to `28s` and `0s`, unchanged text at expiry, further input after expiry, and Tab resetting Time mode to `30s` with fresh text. Synthetic pointer positioning was unreliable; returning to Words through a native click was not conclusively verified, though both mode transitions passed app-state tests and button-message wiring was reviewed. Native Windows, native Wayland, physical input, and packaging remain unverified.
+
+### Four-row viewport and 50-word target — 2026-10-25
+
+The centered panel caps at 700 × 110 logical pixels. Words mode displays a 50-word target while retaining the 500-word buffer; reaching 50 does not end input.
+
+Validation: formatting, strict Clippy, all 23 automated tests (13 library, 8 app policy, 2 integration), and locked debug/release builds passed on Arch Linux. The new boundary test confirms the 500-word buffer remains active after the 50-word target, the monitor caps at `50/50` even with errors, Backspace below the target lowers it, and Tab resets it to `0/50`. `git diff --check` passed.
+
+Native XWayland screenshots at 125% scale confirmed four centered rows, including the faded fourth preview row, at the 875 × 500 physical-pixel minimum and a maximized 1920 × 1050 client area. After 500 targeted keypresses, the counter displayed `50/50` with further words available and the four-row viewport intact. Native Windows and native Wayland remain unverified; earlier input/platform limitations still apply.
+
+### Punctuation and number toggles — 2026-10-25
+
+Generation options are in-memory state and use the existing seeded RNG. No dependency or runtime asset changes were needed.
+
+Validation: formatting, strict Clippy, all 26 automated tests (14 library, 10 app policy, 2 integration), and locked debug/release builds passed on Arch Linux. Seeded tests exercise all four feature combinations, exact token/separator counts, early feature presence, and valid generated content. App tests cover independent toggles, session/timer resets in both modes, preserving settings across Tab/mode changes, and committed punctuation/digit input with word counting and Backspace. `git diff --check` passed. Native feature-toggle clicks and their visual states were not conclusively verified for this follow-up; earlier XWayland timer/viewport evidence remains recorded above. Native Windows, native Wayland, and packaged releases remain unverified.
