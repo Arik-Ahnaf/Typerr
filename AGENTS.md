@@ -67,7 +67,7 @@ Primary reference: [Typerr Figma](https://www.figma.com/design/80x3SZRgeqDp8xOz7
 
 References whose frame or image name ends in “Outline” use colorful rectangles only to mark general layout areas. Preserve their placement and spacing, but do not render those rectangle fills or borders as decoration. The typing panel is transparent and borderless over background `#282A36`, using Google Sans Code Regular 16px and reference foreground `#F8F8F2`. Use the bundled Jomhuria Regular at 48px for branding, `#44475A` control groups, and `#0088FF` for the current word mode and counter. The counter counts target words whose final character has been entered, regardless of correctness, and decreases when Backspace removes that character. It reaches 50/50 on completion and resets on Tab. Footer connections open the OS browser at https://google.com; version/theme labels are informational. This user clarification supersedes the initial interpretation of the cyan panel rectangle.
 
-Interaction defaults, not separately specified by the Figma placeholder: pending `#B4B4B4`, correct `#F8F8F2`, incorrect `#FF6B6B`, and thin caret `#00FDE8`. Base colors are opaque; preview opacity is an additional multiplier. Use `assets/fonts/Google_Sans_Code/static/GoogleSansCode-Regular.ttf` and preserve its OFL notice. Bundle `assets/fonts/Jomhuria/Jomhuria-Regular.ttf` with its OFL notice and embed the supplied SVGs. `src/ui/chrome.rs` owns the native header/footer composition.
+Interaction defaults, not separately specified by the Figma placeholder: pending `#6272A4`, correct `#F8F8F2`, incorrect `#FF5555`, and thin caret `#8BE9FD`. Base colors are opaque; preview opacity is an additional multiplier. Use `assets/fonts/Google_Sans_Code/static/GoogleSansCode-Regular.ttf` and preserve its OFL notice. Bundle `assets/fonts/Jomhuria/Jomhuria-Regular.ttf` with its OFL notice and embed the supplied SVGs. `src/ui/chrome.rs` owns the native header/footer composition.
 
 ## Workflow and quality
 
@@ -78,3 +78,7 @@ Use idiomatic Rust, explicit ownership, standard formatting, and focused tests. 
 Run formatting checks, strict Clippy, tests, and builds using `BUILD.md`. Fix issues and update `PLAN.md` with actual outcomes. Clearly distinguish a compile check, automated behavior test, GUI launch, screenshot inspection, and native-platform verification. Do not call Windows supported because Linux compiled, or call visual behavior verified because unit tests passed.
 
 Before delivery, review all acceptance criteria, architecture boundaries, test results, and documentation. Record remaining limitations and recommended next alpha work. Do not push or publish releases unless separately requested.
+
+## Dracula palette source
+
+`themes/dracula.json` is the color source of truth, copied from `design_references/Dracula Color Pallet.png`. Preserve the image's Current Line value `#6272A4`. Its separate blue accent retains the explicitly requested mode/counter color. The JSON maps UI roles to palette names; `build.rs` validates the hex values and mappings using build-only `serde_json` and generates native color constants imported by `src/ui/theme.rs`. JSON edits require rebuilding; there is no runtime filesystem dependency or theme selector. SVG tinting uses the same constants. The footer displays the theme's JSON name.

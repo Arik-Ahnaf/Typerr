@@ -8,6 +8,9 @@ fn icon(bytes: &'static [u8], width: f32, height: f32) -> svg::Svg<'static> {
     svg(svg::Handle::from_memory(bytes))
         .width(width)
         .height(height)
+        .style(|_, _| svg::Style {
+            color: Some(theme::CORRECT),
+        })
 }
 
 fn control(bytes: &'static [u8], active: bool) -> Element<'static, Message> {
@@ -75,9 +78,18 @@ fn label(value: &'static str) -> iced::widget::Text<'static, iced::Theme, iced::
 
 fn connection(bytes: &'static [u8], width: f32, name: &'static str) -> Element<'static, Message> {
     button(
-        row![icon(bytes, width, 16.0), label(name)]
-            .spacing(5)
-            .align_y(iced::Center),
+        row![
+            icon(bytes, width, 16.0).style(move |_, _| svg::Style {
+                color: Some(if name == "Github" {
+                    theme::CORRECT
+                } else {
+                    theme::BLUE
+                })
+            }),
+            label(name)
+        ]
+        .spacing(5)
+        .align_y(iced::Center),
     )
     .padding(0)
     .on_press(Message::OpenConnection)
@@ -116,7 +128,10 @@ pub fn footer() -> Element<'static, Message> {
             include_bytes!("../../assets/icons/fa-branch.svg"),
             12.0,
             16.0
-        ),
+        )
+        .style(|_, _| svg::Style {
+            color: Some(theme::ORANGE)
+        }),
         label("V0.1")
     ]
     .spacing(5)
@@ -126,8 +141,11 @@ pub fn footer() -> Element<'static, Message> {
             include_bytes!("../../assets/icons/fa-pallet.svg"),
             16.0,
             16.0
-        ),
-        label("Default")
+        )
+        .style(|_, _| svg::Style {
+            color: Some(theme::ORANGE)
+        }),
+        label(theme::NAME)
     ]
     .spacing(5)
     .align_y(iced::Center);

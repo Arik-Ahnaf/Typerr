@@ -55,7 +55,7 @@ The implementation agent must read all four guides first. The coordinating agent
 - At 700 × 400, the centered typing panel matches the reference's 640 × 150 dimensions, 30px horizontal / 125px vertical exterior margins. Its background is transparent and it has no decorative border: the colorful rectangles in the Outline reference indicate general areas only.
 - The visible text block is always centered horizontally and vertically, with shared left alignment within the block. Restart invalidates cached text layout and resets caret/scroll state.
 - Resizing grows/reflows the panel while retaining 16px type, 20px line height, and whole visible rows. No text row is partially clipped at the bottom.
-- Correct input uses `#F8F8F2`; pending text uses `#B4B4B4`; mistakes show the expected glyph in `#FF6B6B`. Incorrect expected spaces remain visibly marked.
+- Correct input uses `#F8F8F2`; pending text uses Dracula Comment `#6272A4`; mistakes show the expected glyph in Dracula Red `#FF5555`. Incorrect expected spaces remain visibly marked.
 - Each printable input consumes one position regardless of correctness. Backspace corrects prior input and crosses word/line boundaries safely.
 - Completing a visual line includes consuming its trailing separator position, then makes the next active line the top visible line. Wrong input at that separator also advances.
 - The bottom visible row is a 50%-opacity preview only when more text exists below the viewport. It becomes opaque when moving upward. The active row is never faded.
@@ -125,3 +125,10 @@ The follow-up also visually verified centering at 1000 × 600 logical pixels and
 - Github, Twitter, and Discord launch `https://google.com` using the OS browser. Browser launch runs off the input thread; the process is reaped. Version/theme labels are informational.
 - Preserved synchronous native input, engine/layout boundaries, terminal completion, wrapping, centering, and viewport behavior. No score page or mode switching was implemented.
 - Validation completed on 2026-10-25: formatting, strict Clippy, all 19 automated tests (13 library, 4 input policy, 2 integration), and locked debug/release builds passed on Arch Linux. `git diff --check` passed. The native debug window was launched outside the checkout on XWayland and its startup screenshot inspected at 125% scaling: bundled branding/icons, dark palette, blue word mode, 0/50 counter, and footer rendered correctly. Synthetic input attempts did not establish native counter/click behavior, so those runtime checks remain unverified; counter boundaries, mistakes, Backspace, and terminal completion are covered by automated tests. Native Windows, native Wayland, browser handoff, IME, and physical input remain unverified for this follow-up. No score page or packaged release was added.
+
+## Dracula palette extraction — 2026-10-25
+
+- Created `themes/dracula.json` with all 12 colors exactly as shown in the supplied palette image, including Current Line `#6272A4`. Kept the required blue accent separate from the reference palette.
+- Added build-time JSON validation and generation of native Iced constants. All UI color roles and SVG tints now use the JSON; the footer shows Dracula. Pending text uses Comment, errors use Red, and the caret uses Cyan.
+- Added `serde_json` as a build-only dependency; no runtime JSON parser, theme switching, or filesystem access was introduced. Rebuild after changing the JSON.
+- Validation: formatting, strict Clippy, all 19 existing automated tests, and locked debug/release builds passed on Arch Linux. An isolated build-script check confirmed that changed JSON colors propagate to generated constants, while malformed hex and unknown color references fail. The source JSON was unchanged by those checks. No new native GUI or Windows verification was performed for this palette-only change.

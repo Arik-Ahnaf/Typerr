@@ -15,7 +15,7 @@ Build separately on native Windows and Arch Linux. A successful build on one tar
 
 Use `typerr-0.1.0-windows-x86_64.zip` and `typerr-0.1.0-arch-linux-x86_64.tar.gz` as proposed names only after the actual build architecture has been verified. Do not label an artifact with an architecture or platform it was not built and checked for.
 
-Both fonts (Google Sans Code and Jomhuria), SVG icons, and the English word list are embedded in the executable. The program must launch from an unrelated working directory without accessing repository assets. Include third-party license notices even when the assets themselves are embedded.
+Both fonts (Google Sans Code and Jomhuria), SVG icons, and the English word list are embedded in the executable. The Dracula palette is compiled from `themes/dracula.json`; a packaged executable does not need an external theme file. Include the JSON and `build.rs` in source distributions. The program must launch from an unrelated working directory without accessing repository assets. Include third-party license notices even when the assets themselves are embedded.
 
 ## Required inputs and tools
 

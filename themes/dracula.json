@@ -1,0 +1,30 @@
+{
+  "name": "Dracula",
+  "colors": {
+    "background": "#282A36",
+    "current_line": "#6272A4",
+    "selection": "#44475A",
+    "foreground": "#F8F8F2",
+    "comment": "#6272A4",
+    "red": "#FF5555",
+    "orange": "#FFB86C",
+    "yellow": "#F1FA8C",
+    "green": "#50FA7B",
+    "cyan": "#8BE9FD",
+    "purple": "#BD93F9",
+    "pink": "#FF79C6"
+  },
+  "accents": {
+    "blue": "#0088FF"
+  },
+  "roles": {
+    "BACKGROUND": "background",
+    "CONTROL_BACKGROUND": "selection",
+    "CORRECT": "foreground",
+    "PENDING": "comment",
+    "INCORRECT": "red",
+    "CYAN": "cyan",
+    "BLUE": "blue",
+    "ORANGE": "orange"
+  }
+}
