@@ -120,7 +120,7 @@ The follow-up also visually verified centering at 1000 × 600 logical pixels and
 
 ### Typing-page follow-up — 2026-10-24
 
-The updated native page uses Iced's `svg` feature; `Cargo.lock` records the additional transitive SVG rendering dependencies. Connection links use `xdg-open` on Arch and `cmd /C start` on Windows. Building and typing remain offline; clicking a connection delegates `https://google.com` to the default browser. Jomhuria and its OFL license are bundled alongside the existing Google Sans Code font.
+The updated native page uses Iced's `svg` feature; `Cargo.lock` records the additional transitive SVG rendering dependencies. Connection links use `xdg-open` on Arch and `cmd /C start` on Windows. Building and typing remain offline; clicking a connection delegates its configured Github, Twitter, or Discord URL to the default browser. Jomhuria and its OFL license are bundled alongside the existing Google Sans Code font.
 
 Validation completed on 2026-10-25: formatting, strict Clippy, all 19 automated tests (13 library, 4 input policy, 2 integration), and locked debug/release builds passed on Arch Linux. `git diff --check` passed. The native debug window was launched outside the checkout on XWayland and its startup screenshot inspected at 125% scaling: bundled branding/icons, dark palette, blue word mode, 0/50 counter, and footer rendered correctly. Synthetic input attempts did not establish native counter/click behavior, so those runtime checks remain unverified; counter boundaries, mistakes, Backspace, and terminal completion are covered by automated tests. Native Windows, native Wayland, browser handoff, IME, and physical input remain unverified for this follow-up. No score page or packaged release was added.
 
@@ -157,3 +157,25 @@ Native XWayland screenshots at 125% scale confirmed four centered rows, includin
 Generation options are in-memory state and use the existing seeded RNG. No dependency or runtime asset changes were needed.
 
 Validation: formatting, strict Clippy, all 26 automated tests (14 library, 10 app policy, 2 integration), and locked debug/release builds passed on Arch Linux. Seeded tests exercise all four feature combinations, exact token/separator counts, early feature presence, and valid generated content. App tests cover independent toggles, session/timer resets in both modes, preserving settings across Tab/mode changes, and committed punctuation/digit input with word counting and Backspace. `git diff --check` passed. Native feature-toggle clicks and their visual states were not conclusively verified for this follow-up; earlier XWayland timer/viewport evidence remains recorded above. Native Windows, native Wayland, and packaged releases remain unverified.
+
+## Typing font settings — 2026-10-25
+
+Edit the repository's `settings.json` before running `cargo run --locked`:
+
+```json
+{
+  "font-size": 16
+}
+```
+
+`font-size` accepts numbers from 8 through 48 in logical pixels, including fractions. Restart the app to apply changes; rebuilding is unnecessary. The app first looks in its working directory, then beside its executable. Missing files or invalid values fall back to 16px; malformed/unreadable files emit a diagnostic. It never rewrites the file. For a portable launch from another directory, place the file beside the executable.
+
+Typing line height is 1.25 times font size. Panel height scales to fit four whole rows plus 30px padding: 110px at 16px font, 150px at 24px font. Startup/minimum window height increases above 400px as needed to preserve 125px top/bottom clearance (520px at 48px font). Header/footer and counter/timer sizes stay unchanged. Runtime JSON parsing uses the existing locked `serde_json` version.
+
+Validation: formatting, strict Clippy, all 28 automated tests, and locked debug/release builds passed on Arch Linux. Configuration tests cover defaults, fractional sizes, malformed JSON, wrong types, and range boundaries. No native GUI or Windows verification was performed for this change.
+
+## Four rows at configurable font sizes — 2026-10-25
+
+Removed the fixed 110px panel height cap. Panel height now fits four configured line heights plus 30px inner padding, rounded upward for fractional sizes. At 24px the panel is 150px high and still fits a 700 × 400 window. Larger fonts increase startup/minimum window height as needed to retain the existing exterior clearance; 48px uses 520px window height. Settings are loaded once and shared between startup geometry and app state. The user's 24px setting was preserved.
+
+Validation: formatting, strict Clippy, all 29 tests, locked debug/release builds, and `git diff --check` passed. A regression test checks four whole viewport rows and minimum-window space at 4,001 font sizes from 8–48px, including the reported 24px case. No native GUI or Windows check was performed; existing platform limitations and next-alpha scope remain unchanged.

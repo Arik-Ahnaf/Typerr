@@ -20,6 +20,7 @@ pub enum Mode {
 pub struct App {
     main: MainTyping,
     focused: bool,
+    settings: crate::settings::Settings,
 }
 
 struct MainTyping {
@@ -69,7 +70,7 @@ impl MainTyping {
 #[derive(Debug, Clone)]
 pub enum Message {
     Native(Event),
-    OpenConnection,
+    OpenConnection(&'static str),
     SelectMode(Mode),
     TogglePunctuation,
     ToggleNumbers,
@@ -90,11 +91,19 @@ impl Default for App {
                 revision: 0,
             },
             focused: true,
+            settings: crate::settings::Settings::default(),
         }
     }
 }
 
 impl App {
+    pub fn new(settings: crate::settings::Settings) -> Self {
+        Self {
+            settings,
+            ..Self::default()
+        }
+    }
+
     pub fn update(&mut self, message: Message) {
         self.update_at(message, Instant::now());
     }
@@ -118,7 +127,7 @@ impl App {
             Message::Native(Event::Window(window::Event::RedrawRequested(now))) => {
                 self.main.tick(now);
             }
-            Message::OpenConnection => open_connection(),
+            Message::OpenConnection(url) => open_connection(url),
             Message::Native(Event::Window(window::Event::Focused)) => self.focused = true,
             Message::Native(Event::Window(window::Event::Unfocused)) => self.focused = false,
             Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
@@ -166,13 +175,14 @@ impl App {
             self.main.monitor(),
             self.main.next_tick(),
             Message::Native,
+            self.settings,
         ))
         .max_width(crate::ui::theme::TYPING_MAX_WIDTH)
-        .max_height(crate::ui::theme::TYPING_MAX_HEIGHT);
+        .max_height(crate::ui::theme::typing_height(self.settings.line_height()));
         let typing = container(panel)
             .padding(iced::Padding {
-                top: 125.0,
-                bottom: 125.0,
+                top: crate::ui::theme::VERTICAL_CLEARANCE,
+                bottom: crate::ui::theme::VERTICAL_CLEARANCE,
                 left: 30.0,
                 right: 30.0,
             })
@@ -191,21 +201,19 @@ impl App {
     }
 }
 
-fn open_connection() {
+fn open_connection(url: &'static str) {
     // Hand off to the OS browser off the input thread and reap the launcher.
-    std::thread::spawn(|| {
+    std::thread::spawn(move || {
         #[cfg(target_os = "windows")]
         let result = {
             use std::os::windows::process::CommandExt;
             std::process::Command::new("cmd")
-                .args(["/C", "start", "", "https://google.com"])
+                .args(["/C", "start", "", url])
                 .creation_flags(0x0800_0000)
                 .status()
         };
         #[cfg(not(target_os = "windows"))]
-        let result = std::process::Command::new("xdg-open")
-            .arg("https://google.com")
-            .status();
+        let result = std::process::Command::new("xdg-open").arg(url).status();
         if let Err(error) = result {
             eprintln!("Could not open connection: {error}");
         }
@@ -243,6 +251,7 @@ mod tests {
                 revision: 0,
             },
             focused: true,
+            settings: crate::settings::Settings::default(),
         }
     }
 

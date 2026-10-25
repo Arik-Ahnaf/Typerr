@@ -19,6 +19,7 @@ pub struct TypingPanel<'a, Message> {
     monitor: String,
     next_tick: Option<Instant>,
     on_event: fn(Event) -> Message,
+    settings: crate::settings::Settings,
 }
 
 #[derive(Default)]
@@ -30,14 +31,19 @@ struct State {
     revision: u64,
     caret: Caret,
     wheel_remainder: f32,
+    font_size: f32,
 }
 
-fn text_definition(content: &str, bounds: Size) -> text::Text<&str> {
+fn text_definition(
+    content: &str,
+    bounds: Size,
+    settings: crate::settings::Settings,
+) -> text::Text<&str> {
     text::Text {
         content,
         bounds,
-        size: theme::FONT_SIZE.into(),
-        line_height: text::LineHeight::Absolute(theme::LINE_HEIGHT.into()),
+        size: settings.font_size.into(),
+        line_height: text::LineHeight::Absolute(settings.line_height().into()),
         font: theme::FONT,
         align_x: text::Alignment::Left,
         align_y: alignment::Vertical::Top,
@@ -53,6 +59,7 @@ impl<'a, Message> TypingPanel<'a, Message> {
         monitor: String,
         next_tick: Option<Instant>,
         on_event: fn(Event) -> Message,
+        settings: crate::settings::Settings,
     ) -> Self {
         Self {
             session,
@@ -60,6 +67,7 @@ impl<'a, Message> TypingPanel<'a, Message> {
             monitor,
             next_tick,
             on_event,
+            settings,
         }
     }
 }
@@ -83,21 +91,24 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
     ) -> layout::Node {
         let size = limits.resolve(Length::Fill, Length::Fill, Size::ZERO);
         let state = tree.state.downcast_mut::<State>();
-        let resized =
-            state.layout.is_none() || state.size != size || state.target != self.session.target();
+        let resized = state.layout.is_none()
+            || state.size != size
+            || state.target != self.session.target()
+            || state.font_size != self.settings.font_size;
         if resized {
             // Query the renderer's paragraph implementation after startup font registration.
             // A single monospaced ASCII glyph has the same advance as each target cell.
             let metrics = NativeParagraph::with_text(text_definition(
                 "m",
-                Size::new(f32::INFINITY, theme::LINE_HEIGHT),
+                Size::new(f32::INFINITY, self.settings.line_height()),
+                self.settings,
             ));
             let advance = metrics.min_width();
             let measured = TextLayout::new(
                 self.session.target(),
                 (size.width - 2.0 * theme::INSET).max(0.0),
                 advance,
-                theme::LINE_HEIGHT,
+                self.settings.line_height(),
             );
             state.viewport.resize(
                 &measured,
@@ -107,6 +118,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             state.layout = Some(measured);
             state.target = self.session.target().to_vec();
             state.size = size;
+            state.font_size = self.settings.font_size;
         }
         let measured = state.layout.as_ref().expect("layout was initialized");
         if state.revision != self.revision {
@@ -160,7 +172,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             let state = tree.state.downcast_mut::<State>();
             let amount = match delta {
                 mouse::ScrollDelta::Lines { y, .. } => -*y,
-                mouse::ScrollDelta::Pixels { y, .. } => -*y / theme::LINE_HEIGHT,
+                mouse::ScrollDelta::Pixels { y, .. } => -*y / self.settings.line_height(),
             };
             state.wheel_remainder += amount;
             let lines = state.wheel_remainder.trunc() as isize;
@@ -202,8 +214,12 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         // Keep the monitor aligned with the measured, centered text block,
         // including when only the final line remains or the window reflows.
         renderer.fill_text(
-            text_definition(&self.monitor, Size::new(inner_width, theme::LINE_HEIGHT))
-                .with_content(self.monitor.clone()),
+            text_definition(
+                &self.monitor,
+                Size::new(inner_width, theme::LINE_HEIGHT),
+                crate::settings::Settings::default(),
+            )
+            .with_content(self.monitor.clone()),
             Point::new(origin.x, origin.y - 30.0),
             theme::BLUE,
             *_viewport,
@@ -213,14 +229,14 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             y: origin.y,
             width: (inner_width - offset.x).max(0.0),
             height: state.viewport.visible_lines(measured.lines.len()).len() as f32
-                * theme::LINE_HEIGHT,
+                * self.settings.line_height(),
         };
         let active = measured.active_line(self.session.position());
         renderer.with_layer(clip, |renderer| {
             for line_index in state.viewport.visible_lines(measured.lines.len()) {
                 let range = &measured.lines[line_index];
-                let y =
-                    origin.y + (line_index - state.viewport.top_line) as f32 * theme::LINE_HEIGHT;
+                let y = origin.y
+                    + (line_index - state.viewport.top_line) as f32 * self.settings.line_height();
                 let opacity = state
                     .viewport
                     .opacity(line_index, active, measured.lines.len());
@@ -243,7 +259,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
                                 renderer::Quad {
                                     bounds: Rectangle {
                                         x,
-                                        y: y + theme::LINE_HEIGHT - 3.0,
+                                        y: y + self.settings.line_height() - 3.0,
                                         width: measured.advance,
                                         height: 2.0,
                                     },
@@ -256,7 +272,8 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
                         renderer.fill_text(
                             text_definition(
                                 &character.to_string(),
-                                Size::new(measured.advance, theme::LINE_HEIGHT),
+                                Size::new(measured.advance, self.settings.line_height()),
+                                self.settings,
                             )
                             .with_content(character.to_string()),
                             Point::new(x, y),
@@ -277,9 +294,9 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
                         bounds: Rectangle {
                             x: origin.x + caret.x,
                             y: origin.y + caret.y
-                                - state.viewport.top_line as f32 * theme::LINE_HEIGHT,
+                                - state.viewport.top_line as f32 * self.settings.line_height(),
                             width: 2.0,
-                            height: theme::LINE_HEIGHT,
+                            height: self.settings.line_height(),
                         },
                         ..Default::default()
                     },

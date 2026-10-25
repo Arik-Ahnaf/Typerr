@@ -97,7 +97,12 @@ fn label(value: &'static str) -> iced::widget::Text<'static, iced::Theme, iced::
         .line_height(iced::widget::text::LineHeight::Absolute(15.0.into()))
 }
 
-fn connection(bytes: &'static [u8], width: f32, name: &'static str) -> Element<'static, Message> {
+fn connection(
+    bytes: &'static [u8],
+    width: f32,
+    name: &'static str,
+    url: &'static str,
+) -> Element<'static, Message> {
     button(
         row![
             icon(bytes, width, 16.0).style(move |_, _| svg::Style {
@@ -113,7 +118,7 @@ fn connection(bytes: &'static [u8], width: f32, name: &'static str) -> Element<'
         .align_y(iced::Center),
     )
     .padding(0)
-    .on_press(Message::OpenConnection)
+    .on_press(Message::OpenConnection(url))
     .style(|_, status| button::Style {
         text_color: if matches!(status, button::Status::Hovered) {
             theme::BLUE
@@ -130,17 +135,20 @@ pub fn footer() -> Element<'static, Message> {
         connection(
             include_bytes!("../../assets/icons/github-logo.svg"),
             16.0,
-            "Github"
+            "Github",
+            "https://github.com/Arik-Ahnaf/Typerr"
         ),
         connection(
             include_bytes!("../../assets/icons/twitter-logo.svg"),
             19.0,
-            "Twitter"
+            "Twitter",
+            "https://x.com/ArikAhnaf1"
         ),
         connection(
             include_bytes!("../../assets/icons/discord-logo.svg"),
             15.0,
-            "Discord"
+            "Discord",
+            "https://discord.gg/FYehF2KCw4"
         ),
     ]
     .spacing(10);
