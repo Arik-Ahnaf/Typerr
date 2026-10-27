@@ -13,13 +13,13 @@ use typerr::{
 
 type NativeParagraph = <Renderer as text::Renderer>::Paragraph;
 
-pub struct TypingPanel<'a, Message> {
+pub struct TypingPanel<'a> {
     session: &'a TypingSession,
     revision: u64,
     generation: u64,
     monitor: String,
-    next_tick: Option<Instant>,
-    on_event: fn(Event) -> Message,
+    opacity: f32,
+    interactive: bool,
     settings: crate::settings::Settings,
 }
 
@@ -125,14 +125,12 @@ fn text_definition(
     }
 }
 
-impl<'a, Message> TypingPanel<'a, Message> {
+impl<'a> TypingPanel<'a> {
     pub fn new(
         session: &'a TypingSession,
         revision: u64,
         generation: u64,
         monitor: String,
-        next_tick: Option<Instant>,
-        on_event: fn(Event) -> Message,
         settings: crate::settings::Settings,
     ) -> Self {
         Self {
@@ -140,13 +138,19 @@ impl<'a, Message> TypingPanel<'a, Message> {
             revision,
             generation,
             monitor,
-            next_tick,
-            on_event,
+            opacity: 1.0,
+            interactive: true,
             settings,
         }
     }
 
-    fn window_event(
+    pub fn presentation(mut self, opacity: f32, interactive: bool) -> Self {
+        self.opacity = opacity;
+        self.interactive = interactive;
+        self
+    }
+
+    fn window_event<Message>(
         &self,
         state: &mut State,
         event: &iced::window::Event,
@@ -157,15 +161,6 @@ impl<'a, Message> TypingPanel<'a, Message> {
             Event::RedrawRequested(now) => {
                 if state.caret.advance(*now) {
                     shell.request_redraw();
-                }
-                // The shell retains the earliest request: animation frames and
-                // countdown seconds share scheduling without restarting either.
-                if let Some(next_tick) = self.next_tick {
-                    if *now >= next_tick {
-                        shell.publish((self.on_event)(iced::Event::Window(event.clone())));
-                    } else {
-                        shell.request_redraw_at(next_tick);
-                    }
                 }
             }
             Event::Unfocused => {
@@ -190,7 +185,7 @@ impl<'a, Message> TypingPanel<'a, Message> {
     }
 }
 
-impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
+impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
     fn size(&self) -> Size<Length> {
         Size::new(Length::Fill, Length::Fill)
     }
@@ -263,17 +258,8 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
         if let Event::Window(event) = event {
             self.window_event(tree.state.downcast_mut::<State>(), event, shell);
         }
-        // Keyboard input must not cross the bounded asynchronous event-subscription
-        // queue: a busy frame can otherwise drop a burst of native keystrokes.
-        if matches!(
-            event,
-            Event::Keyboard(_)
-                | Event::Window(iced::window::Event::Focused | iced::window::Event::Unfocused)
-        ) {
-            shell.publish((self.on_event)(event.clone()));
-            if matches!(event, Event::Keyboard(_)) {
-                shell.capture_event();
-            }
+        // PageHost forwards native keys/focus exactly once on every page.
+        if !self.interactive {
             return;
         }
         if !cursor.is_over(layout.bounds()) {
@@ -325,7 +311,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
             )
             .with_content(self.monitor.clone()),
             Point::new(origin.x, origin.y - 30.0),
-            theme::BLUE,
+            theme::alpha(theme::BLUE, self.opacity),
             *_viewport,
         );
         let clip = Rectangle {
@@ -355,7 +341,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
                         CharacterState::Correct => theme::CORRECT,
                         CharacterState::Incorrect => theme::INCORRECT,
                     };
-                    color.a *= opacity;
+                    color.a *= opacity * self.opacity;
                     let x = origin.x + (index - range.start) as f32 * measured.advance;
                     if character == ' ' {
                         if status == CharacterState::Incorrect {
@@ -413,15 +399,15 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_, Message> {
                         },
                         ..Default::default()
                     },
-                    theme::CYAN,
+                    theme::alpha(theme::CYAN, self.opacity),
                 );
             });
         }
     }
 }
 
-impl<'a, Message: 'a> From<TypingPanel<'a, Message>> for Element<'a, Message> {
-    fn from(panel: TypingPanel<'a, Message>) -> Self {
+impl<'a, Message: 'a> From<TypingPanel<'a>> for Element<'a, Message> {
+    fn from(panel: TypingPanel<'a>) -> Self {
         Self::new(panel)
     }
 }
@@ -453,16 +439,8 @@ mod tests {
         state
     }
 
-    fn panel(session: &TypingSession, next_tick: Option<Instant>) -> TypingPanel<'_, Event> {
-        TypingPanel::new(
-            session,
-            0,
-            0,
-            String::new(),
-            next_tick,
-            |event| event,
-            Default::default(),
-        )
+    fn panel(session: &TypingSession) -> TypingPanel<'_> {
+        TypingPanel::new(session, 0, 0, String::new(), Default::default())
     }
 
     #[test]
@@ -545,14 +523,14 @@ mod tests {
     }
 
     #[test]
-    fn countdown_and_animation_share_redraws_without_editing_or_prolonging_motion() {
+    fn animation_redraws_do_not_edit_or_prolong_motion() {
         let now = Instant::now();
         let deadline = now + Duration::from_secs(1);
         let session = TypingSession::new("one two three four five six seven");
         let mut state = state(&session, now);
         state.sync_caret(1, 1, 0, false, now);
-        let timed_panel = panel(&session, Some(deadline));
-        let mut messages = Vec::new();
+        let timed_panel = panel(&session);
+        let mut messages: Vec<Event> = Vec::new();
         let mut shell = Shell::new(&mut messages);
         timed_panel.window_event(
             &mut state,
@@ -569,7 +547,7 @@ mod tests {
             &WindowEvent::RedrawRequested(now + MOVEMENT),
             &mut shell,
         );
-        assert_eq!(shell.redraw_request(), RedrawRequest::At(deadline));
+        assert_eq!(shell.redraw_request(), RedrawRequest::Wait);
         assert_eq!(state.caret.rendered, state.caret.target);
         state.scroll(1, 1);
         let mut shell = Shell::new(&mut messages);
@@ -579,14 +557,11 @@ mod tests {
             &mut shell,
         );
         assert_eq!(shell.redraw_request(), RedrawRequest::Wait);
-        assert_eq!(
-            messages,
-            [Event::Window(WindowEvent::RedrawRequested(deadline))]
-        );
+        assert!(messages.is_empty());
         assert_eq!(state.revision, 1);
         assert_eq!(state.viewport.top_line, 1);
         let mut shell = Shell::new(&mut messages);
-        panel(&session, None).window_event(
+        panel(&session).window_event(
             &mut state,
             &WindowEvent::RedrawRequested(deadline + MOVEMENT),
             &mut shell,
@@ -599,8 +574,8 @@ mod tests {
         let now = Instant::now();
         let session = TypingSession::new("one two three four five six seven");
         let mut state = state(&session, now);
-        let panel = panel(&session, Some(now + Duration::from_secs(1)));
-        let mut messages = Vec::new();
+        let panel = panel(&session);
+        let mut messages: Vec<Event> = Vec::new();
         let mut shell = Shell::new(&mut messages);
         state.sync_caret(2, 1, 0, false, now);
         panel.window_event(&mut state, &WindowEvent::Unfocused, &mut shell);

@@ -18,10 +18,13 @@ fn control(
     bytes: &'static [u8],
     active: bool,
     action: Option<Message>,
+    opacity: f32,
 ) -> Element<'static, Message> {
-    let glyph = icon(bytes, 20.0, 20.0).style(move |_, _| svg::Style {
-        color: Some(if active { theme::BLUE } else { theme::CORRECT }),
-    });
+    let glyph = icon(bytes, 20.0, 20.0)
+        .opacity(opacity)
+        .style(move |_, _| svg::Style {
+            color: Some(if active { theme::BLUE } else { theme::CORRECT }),
+        });
     button(container(glyph).center_x(35).center_y(30))
         .padding(0)
         .on_press_maybe(action)
@@ -32,18 +35,19 @@ fn control(
 fn group(
     left: Element<'static, Message>,
     right: Element<'static, Message>,
+    opacity: f32,
 ) -> Element<'static, Message> {
     container(row![left, right])
         .padding([0, 5])
-        .style(|_| container::Style {
-            background: Some(theme::CONTROL_BACKGROUND.into()),
+        .style(move |_| container::Style {
+            background: Some(theme::alpha(theme::CONTROL_BACKGROUND, opacity).into()),
             border: iced::Border::default().rounded(8),
             ..Default::default()
         })
         .into()
 }
 
-pub fn header(mode: Mode, options: words::Options) -> Element<'static, Message> {
+pub fn brand() -> Element<'static, Message> {
     let brand = row![
         container(icon(
             include_bytes!("../../assets/icons/keyboard.svg"),
@@ -57,34 +61,51 @@ pub fn header(mode: Mode, options: words::Options) -> Element<'static, Message> 
             .line_height(1.0),
     ]
     .spacing(8);
+    container(brand)
+        .padding(iced::Padding::ZERO.top(30).left(50))
+        .into()
+}
+
+pub fn header(
+    mode: Mode,
+    options: words::Options,
+    opacity: f32,
+    enabled: bool,
+) -> Element<'static, Message> {
     let controls = row![
         group(
             control(
                 include_bytes!("../../assets/icons/punctuation.svg"),
                 options.punctuation,
-                Some(Message::TogglePunctuation)
+                enabled.then_some(Message::TogglePunctuation),
+                opacity
             ),
             control(
-                include_bytes!("../../assets/icons/Vector-1.svg"),
+                include_bytes!("../../assets/icons/hash.svg"),
                 options.numbers,
-                Some(Message::ToggleNumbers)
+                enabled.then_some(Message::ToggleNumbers),
+                opacity
             ),
+            opacity,
         ),
         group(
             control(
                 include_bytes!("../../assets/icons/time-mode.svg"),
                 mode == Mode::Time,
-                Some(Message::SelectMode(Mode::Time))
+                enabled.then_some(Message::SelectMode(Mode::Time)),
+                opacity
             ),
             control(
                 include_bytes!("../../assets/icons/word-mode.svg"),
                 mode == Mode::Words,
-                Some(Message::SelectMode(Mode::Words))
+                enabled.then_some(Message::SelectMode(Mode::Words)),
+                opacity
             ),
+            opacity,
         ),
     ]
     .spacing(10);
-    container(row![brand, Space::new().width(Fill), controls])
+    container(row![Space::new().width(Fill), controls])
         .padding(iced::Padding::ZERO.top(30).left(50).right(80))
         .width(Fill)
         .into()
@@ -102,53 +123,66 @@ fn connection(
     width: f32,
     name: &'static str,
     url: &'static str,
+    opacity: f32,
+    enabled: bool,
 ) -> Element<'static, Message> {
     button(
         row![
-            icon(bytes, width, 16.0).style(move |_, _| svg::Style {
-                color: Some(if name == "Github" {
-                    theme::CORRECT
-                } else {
-                    theme::BLUE
-                })
-            }),
+            icon(bytes, width, 16.0)
+                .opacity(opacity)
+                .style(move |_, _| svg::Style {
+                    color: Some(if name == "Github" {
+                        theme::CORRECT
+                    } else {
+                        theme::BLUE
+                    })
+                }),
             label(name)
         ]
         .spacing(5)
         .align_y(iced::Center),
     )
     .padding(0)
-    .on_press(Message::OpenConnection(url))
-    .style(|_, status| button::Style {
-        text_color: if matches!(status, button::Status::Hovered) {
-            theme::BLUE
-        } else {
-            theme::CORRECT
-        },
+    .on_press_maybe(enabled.then_some(Message::OpenConnection(url)))
+    .style(move |_, status| button::Style {
+        text_color: theme::alpha(
+            if matches!(status, button::Status::Hovered) {
+                theme::BLUE
+            } else {
+                theme::CORRECT
+            },
+            opacity,
+        ),
         ..Default::default()
     })
     .into()
 }
 
-pub fn footer() -> Element<'static, Message> {
+pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
     let links = row![
         connection(
             include_bytes!("../../assets/icons/github-logo.svg"),
             16.0,
             "Github",
-            "https://github.com/Arik-Ahnaf/Typerr"
+            "https://github.com/Arik-Ahnaf/Typerr",
+            opacity,
+            enabled
         ),
         connection(
             include_bytes!("../../assets/icons/twitter-logo.svg"),
             19.0,
             "Twitter",
-            "https://x.com/ArikAhnaf1"
+            "https://x.com/ArikAhnaf1",
+            opacity,
+            enabled
         ),
         connection(
             include_bytes!("../../assets/icons/discord-logo.svg"),
             15.0,
             "Discord",
-            "https://discord.gg/FYehF2KCw4"
+            "https://discord.gg/FYehF2KCw4",
+            opacity,
+            enabled
         ),
     ]
     .spacing(10);
@@ -158,10 +192,11 @@ pub fn footer() -> Element<'static, Message> {
             12.0,
             16.0
         )
+        .opacity(opacity)
         .style(|_, _| svg::Style {
             color: Some(theme::ORANGE)
         }),
-        label("V0.1")
+        label("V0.1").color(theme::alpha(theme::CORRECT, opacity))
     ]
     .spacing(5)
     .align_y(iced::Center);
@@ -171,10 +206,11 @@ pub fn footer() -> Element<'static, Message> {
             16.0,
             16.0
         )
+        .opacity(opacity)
         .style(|_, _| svg::Style {
             color: Some(theme::ORANGE)
         }),
-        label(theme::NAME)
+        label(theme::NAME).color(theme::alpha(theme::CORRECT, opacity))
     ]
     .spacing(5)
     .align_y(iced::Center);

@@ -1,7 +1,7 @@
 use crate::ui::typing_panel::TypingPanel;
 use iced::{
     Element, Event, keyboard,
-    widget::{container, stack},
+    widget::{Space, container, stack},
     window,
 };
 use std::time::{Duration, Instant};
@@ -9,6 +9,28 @@ use typerr::{engine::TypingSession, words};
 
 const TIME_LIMIT_SECONDS: u64 = 30;
 const WORD_TARGET: usize = 50;
+const FADE_DURATION: Duration = Duration::from_millis(300);
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Page {
+    Typing,
+    Transition { started: Instant, now: Instant },
+    Score,
+}
+impl Page {
+    fn score_opacity(self) -> f32 {
+        match self {
+            Self::Typing => 0.0,
+            Self::Score => 1.0,
+            Self::Transition { started, now } => {
+                let t = (now.saturating_duration_since(started).as_secs_f32()
+                    / FADE_DURATION.as_secs_f32())
+                .clamp(0.0, 1.0);
+                t * t * (3.0 - 2.0 * t)
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Mode {
@@ -19,6 +41,7 @@ pub enum Mode {
 
 pub struct App {
     main: MainTyping,
+    page: Page,
     focused: bool,
     settings: crate::settings::Settings,
 }
@@ -37,7 +60,11 @@ struct MainTyping {
 
 impl MainTyping {
     fn restart(&mut self) {
-        self.session = TypingSession::new(words::generate(&mut rand::rng(), self.options));
+        self.replace(words::generate(&mut rand::rng(), self.options));
+    }
+
+    fn replace(&mut self, target: String) {
+        self.session = TypingSession::new(target);
         self.deadline = None;
         self.seconds_remaining = TIME_LIMIT_SECONDS;
         self.revision = self.revision.wrapping_add(1);
@@ -77,6 +104,8 @@ pub enum Message {
     SelectMode(Mode),
     TogglePunctuation,
     ToggleNumbers,
+    Next,
+    Retry,
 }
 
 impl Default for App {
@@ -94,6 +123,7 @@ impl Default for App {
                 revision: 0,
                 generation: 0,
             },
+            page: Page::Typing,
             focused: true,
             settings: crate::settings::Settings::default(),
         }
@@ -112,26 +142,70 @@ impl App {
         self.update_at(message, Instant::now());
     }
 
+    fn advance(&mut self, now: Instant) {
+        if self.page == Page::Typing {
+            self.main.tick(now);
+            if self.main.mode == Mode::Time
+                && self.main.deadline.is_some_and(|deadline| now >= deadline)
+            {
+                self.finish(self.main.deadline.expect("expired deadline"));
+            }
+        }
+        if let Page::Transition { started, .. } = self.page {
+            self.page = if now.saturating_duration_since(started) >= FADE_DURATION {
+                Page::Score
+            } else {
+                Page::Transition { started, now }
+            };
+        }
+    }
+
+    fn finish(&mut self, now: Instant) {
+        if self.page == Page::Typing {
+            self.page = Page::Transition { started: now, now };
+        }
+    }
+
+    fn finished(&self) -> bool {
+        self.main.session.status() == typerr::engine::SessionStatus::Complete
+            || (self.main.mode == Mode::Words && self.main.session.completed_words() >= WORD_TARGET)
+    }
+
     fn update_at(&mut self, message: Message, now: Instant) {
+        let now = if let Message::Native(Event::Window(window::Event::RedrawRequested(timestamp))) =
+            &message
+        {
+            *timestamp
+        } else {
+            now
+        };
+        // Enforce the time limit even if an input arrives before a delayed redraw.
+        self.advance(now);
         match message {
-            Message::TogglePunctuation => {
+            Message::Next if self.page == Page::Score => {
+                self.main.restart();
+                self.page = Page::Typing;
+            }
+            Message::Retry if self.page == Page::Score => {
+                self.main
+                    .replace(self.main.session.target().iter().collect());
+                self.page = Page::Typing;
+            }
+            Message::TogglePunctuation if self.page == Page::Typing => {
                 self.main.options.punctuation = !self.main.options.punctuation;
                 self.main.restart();
             }
-            Message::ToggleNumbers => {
+            Message::ToggleNumbers if self.page == Page::Typing => {
                 self.main.options.numbers = !self.main.options.numbers;
                 self.main.restart();
             }
-            Message::SelectMode(mode) => {
+            Message::SelectMode(mode) if self.page == Page::Typing => {
                 if self.main.mode != mode {
                     self.main.mode = mode;
                     self.main.restart();
                 }
             }
-            Message::Native(Event::Window(window::Event::RedrawRequested(now))) => {
-                self.main.tick(now);
-            }
-            Message::OpenConnection(url) => open_connection(url),
+            Message::OpenConnection(url) if self.page == Page::Typing => open_connection(url),
             Message::Native(Event::Window(window::Event::Focused)) => self.focused = true,
             Message::Native(Event::Window(window::Event::Unfocused)) => self.focused = false,
             Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
@@ -147,7 +221,11 @@ impl App {
                 if key == keyboard::Key::Named(keyboard::key::Named::Tab) {
                     if !repeat && !modifiers.shift() {
                         self.main.restart();
+                        self.page = Page::Typing;
                     }
+                    return;
+                }
+                if self.page != Page::Typing {
                     return;
                 }
                 let changed = if key == keyboard::Key::Named(keyboard::key::Named::Backspace) {
@@ -157,6 +235,10 @@ impl App {
                     if let Some(text) = text {
                         for c in text.chars() {
                             changed |= self.main.session.input(c);
+                            if self.finished() {
+                                self.finish(now);
+                                break;
+                            }
                         }
                     }
                     if changed && self.main.mode == Mode::Time && self.main.deadline.is_none() {
@@ -172,16 +254,17 @@ impl App {
         }
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
-        let panel = container(TypingPanel::new(
-            &self.main.session,
-            self.main.revision,
-            self.main.generation,
-            self.main.monitor(),
-            self.main.next_tick(),
-            Message::Native,
-            self.settings,
-        ))
+    fn typing_view(&self, opacity: f32, enabled: bool) -> Element<'_, Message> {
+        let panel = container(
+            TypingPanel::new(
+                &self.main.session,
+                self.main.revision,
+                self.main.generation,
+                self.main.monitor(),
+                self.settings,
+            )
+            .presentation(opacity, enabled),
+        )
         .max_width(crate::ui::theme::TYPING_MAX_WIDTH)
         .max_height(crate::ui::theme::typing_height(self.settings.line_height()));
         let typing = container(panel)
@@ -197,11 +280,38 @@ impl App {
             .height(iced::Fill);
         stack![
             typing,
-            crate::ui::chrome::header(self.main.mode, self.main.options),
-            container(crate::ui::chrome::footer())
+            crate::ui::chrome::header(self.main.mode, self.main.options, opacity, enabled),
+            container(crate::ui::chrome::footer(opacity, enabled))
                 .height(iced::Fill)
-                .align_y(iced::Bottom),
+                .align_y(iced::Bottom)
         ]
+        .into()
+    }
+
+    pub fn view(&self) -> Element<'_, Message> {
+        let opacity = self.page.score_opacity();
+        let typing: Element<'_, Message> = if self.page == Page::Score {
+            Space::new().width(iced::Fill).height(iced::Fill).into()
+        } else {
+            self.typing_view(1.0 - opacity, self.page == Page::Typing)
+        };
+        let score: Element<'_, Message> = if self.page == Page::Typing {
+            Space::new().into()
+        } else {
+            container(crate::ui::score::view(opacity, self.page == Page::Score))
+                .center_x(iced::Fill)
+                .center_y(iced::Fill)
+                .into()
+        };
+        crate::ui::page_host::PageHost::new(
+            stack![typing, score, crate::ui::chrome::brand()],
+            if self.page == Page::Typing {
+                self.main.next_tick()
+            } else {
+                None
+            },
+            matches!(self.page, Page::Transition { .. }),
+        )
         .into()
     }
 }
@@ -256,6 +366,7 @@ mod tests {
                 revision: 0,
                 generation: 0,
             },
+            page: Page::Typing,
             focused: true,
             settings: crate::settings::Settings::default(),
         }
@@ -445,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn timer_expiry_preserves_session_and_allows_typing() {
+    fn timer_expiry_freezes_session_and_opens_score() {
         let mut app = app("abcdef");
         app.main.mode = Mode::Time;
         let start = Instant::now();
@@ -465,7 +576,8 @@ mod tests {
             key(Key::Character("b".into()), Some("b"), Modifiers::empty()),
             start + Duration::from_secs(101),
         );
-        assert_eq!(app.main.session.entered(), &['a', 'b']);
+        assert_eq!(app.main.session.entered(), &['a']);
+        assert_eq!(app.page, Page::Score);
         assert_eq!(app.main.monitor(), "0s");
         app.update(key(Key::Named(Named::Backspace), None, Modifiers::empty()));
         assert_eq!(app.main.session.entered(), &['a']);
@@ -511,40 +623,135 @@ mod tests {
         }
     }
     #[test]
-    fn word_target_caps_counter_without_finishing_the_buffer() {
-        let mut app = app(&vec!["ab"; 500].join(" "));
-        assert_eq!(app.main.monitor(), "0/50");
-        assert_eq!(app.main.session.word_count(), 500);
-        for completed in 1..=51 {
-            // Incorrect input still completes a target word.
-            app.update(key(
-                Key::Character("xx".into()),
-                Some("xx"),
+    fn word_target_finishes_on_fiftieth_final_character_and_discards_remaining_text() {
+        let mut app = app(&vec!["ab,"; 500].join(" "));
+        let now = Instant::now();
+        app.update_at(
+            key(
+                Key::Character("x".into()),
+                Some(&"xxx ".repeat(49)),
                 Modifiers::empty(),
-            ));
-            assert_eq!(app.main.session.completed_words(), completed);
-            assert_eq!(app.main.monitor(), format!("{}/50", completed.min(50)));
-            assert_eq!(
-                app.main.session.status(),
-                typerr::engine::SessionStatus::Active
-            );
-            app.update(key(
-                Key::Character(" ".into()),
-                Some(" "),
-                Modifiers::empty(),
-            ));
-        }
-        // Editing above the target stays capped; deleting the 50th word's last
-        // letter brings the displayed progress below the target again.
-        for _ in 0..4 {
-            app.update(key(Key::Named(Named::Backspace), None, Modifiers::empty()));
-            assert_eq!(app.main.monitor(), "50/50");
-        }
-        app.update(key(Key::Named(Named::Backspace), None, Modifiers::empty()));
+            ),
+            now,
+        );
+        assert_eq!(app.main.session.completed_words(), 49);
+        app.update_at(
+            key(Key::Character("x".into()), Some("xx"), Modifiers::empty()),
+            now,
+        );
+        assert_eq!(app.page, Page::Typing);
         assert_eq!(app.main.monitor(), "49/50");
-        app.update(key(Key::Named(Named::Tab), None, Modifiers::empty()));
-        assert_eq!(app.main.monitor(), "0/50");
-        assert_eq!(app.main.session.word_count(), 500);
+        app.update_at(
+            key(
+                Key::Character("x".into()),
+                Some("x ignored extra"),
+                Modifiers::empty(),
+            ),
+            now,
+        );
+        assert_eq!(app.main.session.completed_words(), 50);
+        assert_eq!(app.main.session.position(), 199);
+        assert!(matches!(app.page, Page::Transition { .. }));
+        let revision = app.main.revision;
+        app.update_at(
+            key(Key::Named(Named::Backspace), None, Modifiers::empty()),
+            now,
+        );
+        app.update_at(Message::ToggleNumbers, now);
+        app.update_at(Message::Next, now);
+        assert_eq!(app.main.revision, revision);
+        assert_eq!(app.main.session.position(), 199);
+    }
+
+    #[test]
+    fn crossfade_uses_elapsed_time_and_tab_can_cancel() {
+        let mut app = app("a");
+        let now = Instant::now();
+        app.update_at(
+            key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+            now,
+        );
+        assert_eq!(app.page.score_opacity(), 0.);
+        tick(&mut app, now + FADE_DURATION / 2);
+        assert!((app.page.score_opacity() - 0.5).abs() < 0.0001);
+        app.update_at(
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            now + FADE_DURATION / 2,
+        );
+        assert_eq!(app.page, Page::Typing);
+        assert_eq!(app.main.generation, 1);
+        app.finish(now);
+        tick(&mut app, now + FADE_DURATION);
+        assert_eq!(app.page, Page::Score);
+        assert_eq!(app.page.score_opacity(), 1.);
+        tick(&mut app, now + Duration::from_secs(60));
+        assert_eq!(app.page, Page::Score);
+    }
+
+    #[test]
+    fn expiry_precedes_input_and_catches_up_after_focus_loss() {
+        for elapsed in [Duration::from_secs(30), Duration::from_secs(60)] {
+            let mut app = app("abcdef");
+            app.main.mode = Mode::Time;
+            let now = Instant::now();
+            app.update_at(
+                key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+                now,
+            );
+            app.update_at(
+                key(Key::Character("b".into()), Some("b"), Modifiers::empty()),
+                now + elapsed,
+            );
+            assert_eq!(app.main.session.entered(), &['a']);
+            assert_ne!(app.page, Page::Typing);
+            app.update_at(
+                Message::Native(Event::Window(window::Event::Unfocused)),
+                now + elapsed,
+            );
+            tick(&mut app, now + elapsed + FADE_DURATION);
+            assert_eq!(app.page, Page::Score);
+        }
+    }
+
+    #[test]
+    fn score_actions_preserve_options_and_reset_all_session_state() {
+        for action in [
+            Message::Next,
+            Message::Retry,
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+        ] {
+            let mut app = app("same text,");
+            app.main.mode = Mode::Time;
+            app.main.options = words::Options {
+                punctuation: true,
+                numbers: true,
+            };
+            let now = Instant::now();
+            app.update_at(
+                key(Key::Character("x".into()), Some("x"), Modifiers::empty()),
+                now,
+            );
+            tick(&mut app, now + Duration::from_secs(31));
+            let revision = app.main.revision;
+            let retry = matches!(action, Message::Retry);
+            app.update_at(action, now + Duration::from_secs(32));
+            assert_eq!(app.page, Page::Typing);
+            assert_eq!(app.main.mode, Mode::Time);
+            assert!(app.main.options.punctuation && app.main.options.numbers);
+            assert_eq!(app.main.session.position(), 0);
+            assert_eq!(app.main.deadline, None);
+            assert_eq!(app.main.seconds_remaining, 30);
+            assert_eq!(app.main.revision, revision + 1);
+            assert_eq!(app.main.generation, 1);
+            if retry {
+                assert_eq!(
+                    app.main.session.target().iter().collect::<String>(),
+                    "same text,"
+                );
+            } else {
+                assert_eq!(app.main.session.word_count(), 500);
+            }
+        }
     }
     #[test]
     fn feature_toggles_are_independent_reset_progress_and_survive_restarts_and_modes() {

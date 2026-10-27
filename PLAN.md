@@ -4,9 +4,9 @@
 
 Current target: **Alpha 0.1**, crate version `0.1.0`.
 
-Deliver a native Rust/Iced Main Typing page with 500 randomly selected English words per mode, responsive reflow, immediate input, expected-glyph error highlighting, Backspace, terminal completion, and smooth 100 ms caret movement.
+Deliver native Rust/Iced Main Typing and Score pages with 500-word buffers, responsive input/layout, smooth 100 ms caret movement, and a 300 ms completion crossfade. The Score page uses fixed mock statistics and a native Canvas graph; real scoring is deferred.
 
-The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. Score and other pages remain excluded.
+The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. The 2026-10-27 score follow-up supersedes the earlier no-navigation rules; Dashboard and Settings remain excluded.
 
 ## Planning decisions
 
@@ -60,7 +60,7 @@ The implementation agent must read all four guides first. The coordinating agent
 - Completing a visual line includes consuming its trailing separator position, then makes the next active line the top visible line. Wrong input at that separator also advances.
 - The bottom visible row is a 50%-opacity preview only when more text exists below the viewport. It becomes opaque when moving upward. The active row is never faded.
 - Wheel scrolling permits inspection; accepted typing, successful Backspace, and resize restore the active line at the top.
-- The final input completes the session with no dialog, page change, or automatic restart. An unmodified Tab keypress explicitly starts a fresh 500-word race in the current mode at any time, including after completion. While completed, further typing and Backspace are ignored until Tab restarts. The final line remains visible instead of advancing to an empty row; wheel inspection remains possible.
+- Words finishes at target word 50; Time finishes at its monotonic 30-second deadline; full-buffer exhaustion also finishes either mode. Freeze edits and crossfade to Score over 300 ms. Tab starts fresh at any time, including during the fade. On Score, Next generates new text and Retry reuses the target; both reset progress/timer/presentation while preserving mode/options.
 - The engine has no Iced dependency, and logical progress is independent from rendered caret coordinates.
 - The caret uses always-on 100 ms `inOut(1.25)` movement, including line returns and Backspace. Rapid input retargets from the current interpolated position; resets, reflow, and focus loss cancel movement immediately. Animation and countdown redraws preserve manual inspection and edit revisions.
 - Embedded assets work when the binary is launched outside the repository directory.
@@ -99,7 +99,7 @@ The word list contains exactly 200 original curated words. Keyboard/focus events
 - Arch Linux release launch and the native XWayland checks above passed. Native Wayland and Windows build/runtime verification remain pending.
 - Alpha 0.1 uses a monospaced ASCII English target. Full IME/composition, international word sets, and advanced Unicode shaping are future work unless separately verified.
 - Smooth caret interpolation and line returns are implemented. User-configurable movement, blinking, and animated text scrolling remain future work; duration/easing are centralized for later adjustments.
-- Score, Dashboard, Settings, configurable durations, and on-screen restart controls require later version plans.
+- Real score calculations/history, Dashboard, Settings, and configurable durations require later version plans. Mock Score and its Next/Retry controls are implemented by the score follow-up below.
 - Installer creation, distribution automation, signing, and publication remain unimplemented; see `PACKAGING.md`.
 
 ## Follow-up: Tab restart and centering
@@ -200,3 +200,20 @@ Validation: formatting, strict Clippy, all 29 tests, locked debug/release builds
 - Preserved the engine/layout interfaces, synchronous keyboard delivery, countdown semantics, crate version `0.1.0`, solid cyan caret, and the user's 24px setting. No new configuration, controls, dependencies, packaging, push, or publication.
 - Validation: all 41 tests passed (14 library, 25 binary, 2 integration), including 12 new animation/presentation/input tests. Formatting, strict Clippy, locked debug/release builds, and whitespace review are recorded in `BUILD.md`.
 - Native Arch/XWayland captures at 125% scale and 16px/24px fonts recorded intermediate movement, rapid retargeting, forward/backward wraps, restart during movement, resize, and terminal completion. Matching Backspaces restored the exact initial caret after rapid input and 100-event bursts; completed-window pixels were unchanged by further input/Backspace. Native wheel/focus interactions, Windows, native Wayland, physical held-key repeat, and IME remain unverified for this follow-up; deterministic tests cover wheel/focus/countdown policy.
+
+## Score page follow-up — 2026-10-27
+
+User-authorized scope supersedes earlier typing-only completion rules. Implemented native Score from Figma `59:3` and graph template `94:66`: fixed 700 × 400 composition, embedded fonts and the supplied next/restart SVGs (plus hash.svg for the numbers toggle), hardcoded WPM/ACC/Raw/Consistency/Time, and a Canvas plot with monotone cubic WPM/raw curves, error markers/axis, grid, and PB guide. The green placeholder is removed, tick 3 restored, and template colors adapted to the existing theme. Canvas enables six locked transitive geometry dependencies, with no additional direct dependency.
+
+Completion freezes input at 50 words or 30 seconds (or buffer exhaustion) and performs a smoothstep 300 ms crossfade. Expiry precedes input even after a missed redraw, and committed text stops at the exact completion character. App presentation state is explicit; the native page host forwards keyboard/focus once and schedules countdown/transition redraws while the typing widget retains caret scheduling. Shared branding stays steady.
+
+Next/Tab generate new text; Retry reconstructs the identical target. All preserve mode/options, reset progress/timer/caret/viewport, and increment session generation. Pointer actions are disabled during the fade; Tab may cancel it. Fixed score data and typography are independent of session duration and typing font size. Existing packaging work is preserved; package regeneration, version changes, publication, real statistics, and persistence are excluded.
+
+Validation on Arch Linux:
+
+- All 47 automated tests pass (14 library, 31 app/widget, 2 integration). Coverage includes the exact 50th-word boundary with mistakes/punctuation, discarded surplus committed text, expiry before input, delayed/focus-loss catch-up, elapsed-time fade endpoints/midpoint/cancellation, fresh/identical-target resets, native event publication and scheduling, graph mapping, and bounded interpolation.
+- Formatting, strict all-target Clippy, locked debug/release builds, and `git diff --check` pass. No version change, package rebuild, push, or release was performed.
+- Native XWayland rendering at 125% scale was exercised by an isolated temporary harness that drives the production app messages and captures Iced's own renderer. Captures cover 16/24/48px typing settings (875 × 500, 875 × 500, and 875 × 650 physical startup sizes), intermediate fades, frozen results, Next/Retry/Tab, and a larger 1000 × 650 logical window. The complete 30-second timer was allowed to expire. Final time-mode output is pixel-identical to the corresponding words result.
+- Pixel comparisons confirm successful edits, Backspace/Retry restoring the exact initial text, Next producing new text, ignored result edits, intermediate crossfade frames, and unchanged branding throughout the fade. Visually inspected the graph, all labels/axes, replacement next/restart/hash assets, larger score layout, and pre-expiry timer. Score remains independent of the typing font size.
+- Initial external X11 automation was unreliable: core pointer coordinates differed from compositor coordinates, focus changed, and drawable captures returned stale content. Some Next/Retry native messages were observed, but the final evidence uses deterministic app-message injection and native renderer screenshots; it is not a claim of comprehensive physical input/click verification. The temporary harness was removed from `src/` after capture; no debug hooks remain in production code.
+- Evidence: `target/score-verification/render-{16,24,48}/`, `render-results.json`, the preserved temporary `score_verify.rs`, and check/build logs. These are generated local artifacts. Native Windows, native Wayland, physical held-key/IME behavior, and comprehensive real-pointer control checks remain unverified. Real score calculation/history is the next feature work, subject to separate authorization.

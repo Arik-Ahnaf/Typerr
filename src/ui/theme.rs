@@ -8,6 +8,16 @@ pub const VERTICAL_INSET: f32 = 15.0;
 pub const TYPING_MAX_WIDTH: f32 = 700.0;
 pub const VERTICAL_CLEARANCE: f32 = 125.0;
 
+pub fn alpha(mut color: Color, opacity: f32) -> Color {
+    color.a *= opacity.clamp(0.0, 1.0);
+    color
+}
+
+pub const GRAPH_RAW: Color = PENDING;
+pub const GRAPH_GRID: Color = CONTROL_BACKGROUND;
+pub const GRAPH_WPM: Color = BLUE;
+pub const GRAPH_ERROR: Color = INCORRECT;
+
 pub fn typing_height(line_height: f32) -> f32 {
     // Round upward so fractional font sizes never lose a row to rounding.
     (4.0 * line_height + 2.0 * VERTICAL_INSET).ceil()
