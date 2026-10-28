@@ -1,7 +1,7 @@
 use crate::ui::typing_panel::TypingPanel;
 use iced::{
     Element, Event, keyboard,
-    widget::{Space, container, stack},
+    widget::{Space, container, mouse_area, stack},
     window,
 };
 use std::time::{Duration, Instant};
@@ -39,6 +39,15 @@ pub enum Mode {
     Time,
 }
 
+impl Mode {
+    pub const fn amounts(self) -> [u16; 4] {
+        match self {
+            Self::Words => [10, 25, 50, 100],
+            Self::Time => [15, 30, 60, 120],
+        }
+    }
+}
+
 pub struct App {
     main: MainTyping,
     page: Page,
@@ -50,6 +59,9 @@ struct MainTyping {
     session: TypingSession,
     mode: Mode,
     options: words::Options,
+    word_target: usize,
+    time_limit_seconds: u64,
+    amount_picker: Option<Mode>,
     deadline: Option<Instant>,
     seconds_remaining: u64,
     /// Changes on accepted edits or explicit session resets, restoring the viewport.
@@ -66,7 +78,8 @@ impl MainTyping {
     fn replace(&mut self, target: String) {
         self.session = TypingSession::new(target);
         self.deadline = None;
-        self.seconds_remaining = TIME_LIMIT_SECONDS;
+        self.seconds_remaining = self.time_limit_seconds;
+        self.amount_picker = None;
         self.revision = self.revision.wrapping_add(1);
         self.generation = self.generation.wrapping_add(1);
     }
@@ -89,8 +102,8 @@ impl MainTyping {
         match self.mode {
             Mode::Words => format!(
                 "{}/{}",
-                self.session.completed_words().min(WORD_TARGET),
-                WORD_TARGET
+                self.session.completed_words().min(self.word_target),
+                self.word_target
             ),
             Mode::Time => format!("{}s", self.seconds_remaining),
         }
@@ -102,6 +115,9 @@ pub enum Message {
     Native(Event),
     OpenConnection(&'static str),
     SelectMode(Mode),
+    ToggleAmountPicker(Mode),
+    SelectAmount(Mode, u16),
+    DismissAmountPicker,
     TogglePunctuation,
     ToggleNumbers,
     Next,
@@ -118,6 +134,9 @@ impl Default for App {
                 )),
                 mode: Mode::default(),
                 options: words::Options::default(),
+                word_target: WORD_TARGET,
+                time_limit_seconds: TIME_LIMIT_SECONDS,
+                amount_picker: None,
                 deadline: None,
                 seconds_remaining: TIME_LIMIT_SECONDS,
                 revision: 0,
@@ -162,13 +181,15 @@ impl App {
 
     fn finish(&mut self, now: Instant) {
         if self.page == Page::Typing {
+            self.main.amount_picker = None;
             self.page = Page::Transition { started: now, now };
         }
     }
 
     fn finished(&self) -> bool {
         self.main.session.status() == typerr::engine::SessionStatus::Complete
-            || (self.main.mode == Mode::Words && self.main.session.completed_words() >= WORD_TARGET)
+            || (self.main.mode == Mode::Words
+                && self.main.session.completed_words() >= self.main.word_target)
     }
 
     fn update_at(&mut self, message: Message, now: Instant) {
@@ -200,14 +221,34 @@ impl App {
                 self.main.restart();
             }
             Message::SelectMode(mode) if self.page == Page::Typing => {
+                self.main.amount_picker = None;
                 if self.main.mode != mode {
                     self.main.mode = mode;
                     self.main.restart();
                 }
             }
+            Message::ToggleAmountPicker(mode) if self.page == Page::Typing => {
+                self.main.amount_picker = (self.main.amount_picker != Some(mode)).then_some(mode);
+            }
+            Message::SelectAmount(mode, amount)
+                if self.page == Page::Typing
+                    && self.main.amount_picker == Some(mode)
+                    && mode.amounts().contains(&amount) =>
+            {
+                match mode {
+                    Mode::Words => self.main.word_target = usize::from(amount),
+                    Mode::Time => self.main.time_limit_seconds = u64::from(amount),
+                }
+                self.main.mode = mode;
+                self.main.restart();
+            }
+            Message::DismissAmountPicker => self.main.amount_picker = None,
             Message::OpenConnection(url) if self.page == Page::Typing => open_connection(url),
             Message::Native(Event::Window(window::Event::Focused)) => self.focused = true,
-            Message::Native(Event::Window(window::Event::Unfocused)) => self.focused = false,
+            Message::Native(Event::Window(window::Event::Unfocused)) => {
+                self.focused = false;
+                self.main.amount_picker = None;
+            }
             Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
                 key,
                 modifiers,
@@ -228,6 +269,10 @@ impl App {
                 if self.page != Page::Typing {
                     return;
                 }
+                if key == keyboard::Key::Named(keyboard::key::Named::Escape) {
+                    self.main.amount_picker = None;
+                    return;
+                }
                 let changed = if key == keyboard::Key::Named(keyboard::key::Named::Backspace) {
                     self.main.session.backspace()
                 } else {
@@ -242,11 +287,13 @@ impl App {
                         }
                     }
                     if changed && self.main.mode == Mode::Time && self.main.deadline.is_none() {
-                        self.main.deadline = Some(now + Duration::from_secs(TIME_LIMIT_SECONDS));
+                        self.main.deadline =
+                            Some(now + Duration::from_secs(self.main.time_limit_seconds));
                     }
                     changed
                 };
                 if changed {
+                    self.main.amount_picker = None;
                     self.main.revision = self.main.revision.wrapping_add(1);
                 }
             }
@@ -278,12 +325,27 @@ impl App {
             .align_x(iced::Center)
             .align_y(iced::Center)
             .height(iced::Fill);
+        let dismiss: Element<'_, Message> = if enabled && self.main.amount_picker.is_some() {
+            mouse_area(Space::new().width(iced::Fill).height(iced::Fill))
+                .on_press(Message::DismissAmountPicker)
+                .on_right_press(Message::DismissAmountPicker)
+                .into()
+        } else {
+            Space::new().into()
+        };
         stack![
             typing,
-            crate::ui::chrome::header(self.main.mode, self.main.options, opacity, enabled),
             container(crate::ui::chrome::footer(opacity, enabled))
                 .height(iced::Fill)
-                .align_y(iced::Bottom)
+                .align_y(iced::Bottom),
+            dismiss,
+            crate::ui::chrome::header(
+                self.main.mode,
+                self.main.options,
+                self.main.amount_picker,
+                opacity,
+                enabled
+            ),
         ]
         .into()
     }
@@ -361,6 +423,9 @@ mod tests {
                 session: TypingSession::new(target),
                 mode: Mode::default(),
                 options: words::Options::default(),
+                word_target: WORD_TARGET,
+                time_limit_seconds: TIME_LIMIT_SECONDS,
+                amount_picker: None,
                 deadline: None,
                 seconds_remaining: TIME_LIMIT_SECONDS,
                 revision: 0,
@@ -370,6 +435,228 @@ mod tests {
             focused: true,
             settings: crate::settings::Settings::default(),
         }
+    }
+
+    fn select_amount(app: &mut App, mode: Mode, amount: u16) {
+        app.update(Message::ToggleAmountPicker(mode));
+        app.update(Message::SelectAmount(mode, amount));
+    }
+
+    #[test]
+    fn every_word_amount_finishes_at_its_final_character_including_punctuation() {
+        for amount in Mode::Words.amounts() {
+            let mut app = App::default();
+            select_amount(&mut app, Mode::Words, amount);
+            assert_eq!(app.main.session.word_count(), 500);
+            app.main.replace(vec!["ab,"; 500].join(" "));
+            let now = Instant::now();
+            let prefix = format!("{}xx", "xxx ".repeat(usize::from(amount) - 1));
+            app.update_at(
+                key(
+                    Key::Character("x".into()),
+                    Some(&prefix),
+                    Modifiers::empty(),
+                ),
+                now,
+            );
+            assert_eq!(app.page, Page::Typing);
+            assert_eq!(app.main.monitor(), format!("{}/{amount}", amount - 1));
+            app.update_at(
+                key(
+                    Key::Character("x".into()),
+                    Some("x surplus"),
+                    Modifiers::empty(),
+                ),
+                now,
+            );
+            assert!(matches!(app.page, Page::Transition { .. }));
+            assert_eq!(app.main.monitor(), format!("{amount}/{amount}"));
+            assert_eq!(app.main.session.position(), usize::from(amount) * 4 - 1);
+        }
+    }
+
+    #[test]
+    fn every_time_amount_starts_on_input_and_expires_before_late_edits() {
+        for amount in Mode::Time.amounts() {
+            let mut app = App::default();
+            select_amount(&mut app, Mode::Time, amount);
+            assert_eq!(app.main.monitor(), format!("{amount}s"));
+            assert_eq!(app.main.deadline, None);
+            let now = Instant::now();
+            app.update_at(
+                key(Key::Character("x".into()), Some("x"), Modifiers::empty()),
+                now,
+            );
+            assert_eq!(app.main.next_tick(), Some(now + Duration::from_secs(1)));
+            let deadline = now + Duration::from_secs(u64::from(amount));
+            assert_eq!(app.main.deadline, Some(deadline));
+            tick(&mut app, deadline - Duration::from_millis(1));
+            assert_eq!(app.main.monitor(), "1s");
+            app.update_at(
+                key(Key::Character("x".into()), Some("x"), Modifiers::empty()),
+                deadline,
+            );
+            assert_eq!(app.main.session.position(), 1);
+            assert_eq!(app.main.monitor(), "0s");
+            assert!(matches!(app.page, Page::Transition { .. }));
+        }
+    }
+
+    #[test]
+    fn amounts_are_remembered_independently_across_modes_toggles_tab_next_and_retry() {
+        let mut app = App::default();
+        select_amount(&mut app, Mode::Words, 25);
+        select_amount(&mut app, Mode::Time, 120);
+        app.update(Message::SelectMode(Mode::Words));
+        assert_eq!(app.main.monitor(), "0/25");
+        app.update(Message::SelectMode(Mode::Time));
+        assert_eq!(app.main.monitor(), "120s");
+        for action in [
+            Message::ToggleNumbers,
+            Message::TogglePunctuation,
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            Message::Next,
+            Message::Retry,
+        ] {
+            let target = app.main.session.target().to_vec();
+            let retry = matches!(action, Message::Retry);
+            if matches!(action, Message::Next | Message::Retry) {
+                app.page = Page::Score;
+            }
+            app.update(action);
+            assert_eq!(app.main.word_target, 25);
+            assert_eq!(app.main.time_limit_seconds, 120);
+            assert_eq!(app.main.monitor(), "120s");
+            assert_eq!(app.main.deadline, None);
+            assert_eq!(app.main.session.position(), 0);
+            if retry {
+                assert_eq!(app.main.session.target(), target);
+            }
+        }
+    }
+
+    #[test]
+    fn picker_opening_and_dismissal_preserve_session_and_deadline() {
+        let mut app = App::default();
+        app.update(Message::SelectMode(Mode::Time));
+        app.update(key(
+            Key::Character("x".into()),
+            Some("x"),
+            Modifiers::empty(),
+        ));
+        let generation = app.main.generation;
+        let deadline = app.main.deadline;
+        for dismiss in [
+            Message::DismissAmountPicker,
+            Message::ToggleAmountPicker(Mode::Words),
+            key(Key::Named(Named::Escape), None, Modifiers::empty()),
+            Message::SelectMode(Mode::Time),
+            Message::Native(Event::Window(window::Event::Unfocused)),
+        ] {
+            app.update(Message::ToggleAmountPicker(Mode::Words));
+            assert_eq!(app.main.amount_picker, Some(Mode::Words));
+            assert_eq!(app.main.mode, Mode::Time);
+            app.update(dismiss);
+            assert_eq!(app.main.amount_picker, None);
+            assert_eq!(app.main.generation, generation);
+            assert_eq!(app.main.deadline, deadline);
+            assert_eq!(app.main.session.position(), 1);
+        }
+    }
+
+    #[test]
+    fn choosing_amount_resets_once_and_ignores_invalid_or_stale_choices() {
+        let mut app = App::default();
+        app.update(Message::ToggleAmountPicker(Mode::Time));
+        for action in [
+            Message::SelectAmount(Mode::Words, 25),
+            Message::SelectAmount(Mode::Time, 0),
+        ] {
+            app.update(action);
+            assert_eq!(app.main.generation, 0);
+        }
+        app.update(Message::SelectAmount(Mode::Time, 60));
+        assert_eq!(app.main.generation, 1);
+        assert_eq!(app.main.amount_picker, None);
+        assert_eq!(app.main.mode, Mode::Time);
+        assert_eq!(app.main.monitor(), "60s");
+        app.update(Message::SelectAmount(Mode::Time, 60));
+        assert_eq!(app.main.generation, 1);
+        let now = Instant::now();
+        app.finish(now);
+        for action in [
+            Message::ToggleAmountPicker(Mode::Words),
+            Message::SelectAmount(Mode::Words, 10),
+        ] {
+            app.update_at(action, now);
+            assert_eq!(app.main.amount_picker, None);
+            assert_eq!(app.main.generation, 1);
+        }
+    }
+
+    #[test]
+    fn native_pointer_events_open_select_dismiss_and_reuse_mode_amounts() {
+        use iced::advanced::{
+            Layout, Shell, clipboard, layout, mouse, renderer::Headless, widget::Tree,
+        };
+        let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+            crate::ui::theme::FONT,
+            16.0.into(),
+            Some("tiny-skia"),
+        ))
+        .expect("software renderer");
+        let mut app = App::default();
+        let click = |app: &mut App, x, y, button| {
+            let mut view = app.view();
+            let mut tree = Tree::new(&view);
+            let size = iced::Size::new(700.0, 400.0);
+            let node = view.as_widget_mut().layout(
+                &mut tree,
+                &renderer,
+                &layout::Limits::new(iced::Size::ZERO, size),
+            );
+            let mut messages = Vec::new();
+            for event in [
+                mouse::Event::ButtonPressed(button),
+                mouse::Event::ButtonReleased(button),
+            ] {
+                view.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(event),
+                    Layout::new(&node),
+                    mouse::Cursor::Available(iced::Point::new(x, y)),
+                    &renderer,
+                    &mut clipboard::Null,
+                    &mut Shell::new(&mut messages),
+                    &iced::Rectangle::with_size(size),
+                );
+            }
+            drop(view);
+            for message in messages {
+                app.update(message);
+            }
+        };
+        click(&mut app, 597.0, 45.0, mouse::Button::Right);
+        assert_eq!(app.main.amount_picker, Some(Mode::Words));
+        assert_eq!(app.main.generation, 0);
+        click(&mut app, 570.0, 80.0, mouse::Button::Left);
+        assert_eq!(app.main.monitor(), "0/25");
+        assert_eq!(app.main.generation, 1);
+        assert_eq!(app.main.amount_picker, None);
+        click(&mut app, 562.0, 45.0, mouse::Button::Right);
+        assert_eq!(app.main.amount_picker, Some(Mode::Time));
+        click(&mut app, 625.0, 80.0, mouse::Button::Left);
+        assert_eq!(app.main.monitor(), "120s");
+        click(&mut app, 597.0, 45.0, mouse::Button::Left);
+        assert_eq!(app.main.monitor(), "0/25");
+        assert_eq!(app.main.amount_picker, None);
+        let generation = app.main.generation;
+        click(&mut app, 562.0, 45.0, mouse::Button::Right);
+        click(&mut app, 300.0, 200.0, mouse::Button::Left);
+        assert_eq!(app.main.amount_picker, None);
+        assert_eq!(app.main.generation, generation);
+        click(&mut app, 562.0, 45.0, mouse::Button::Left);
+        assert_eq!(app.main.monitor(), "120s");
     }
 
     #[test]

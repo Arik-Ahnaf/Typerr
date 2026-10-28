@@ -1,7 +1,7 @@
 //! Native page chrome; all artwork is compiled into the executable.
 use super::theme;
 use crate::app::{Message, Mode};
-use iced::widget::{Space, button, container, row, svg, text};
+use iced::widget::{Space, button, container, mouse_area, row, stack, svg, text};
 use iced::{Element, Fill, Font};
 use typerr::words;
 
@@ -69,6 +69,7 @@ pub fn brand() -> Element<'static, Message> {
 pub fn header(
     mode: Mode,
     options: words::Options,
+    amount_picker: Option<Mode>,
     opacity: f32,
     enabled: bool,
 ) -> Element<'static, Message> {
@@ -89,25 +90,108 @@ pub fn header(
             opacity,
         ),
         group(
-            control(
+            mode_control(
                 include_bytes!("../../assets/icons/time-mode.svg"),
                 mode == Mode::Time,
-                enabled.then_some(Message::SelectMode(Mode::Time)),
-                opacity
+                Mode::Time,
+                opacity,
+                enabled
             ),
-            control(
+            mode_control(
                 include_bytes!("../../assets/icons/word-mode.svg"),
                 mode == Mode::Words,
-                enabled.then_some(Message::SelectMode(Mode::Words)),
-                opacity
+                Mode::Words,
+                opacity,
+                enabled
             ),
             opacity,
         ),
     ]
     .spacing(10);
-    container(row![Space::new().width(Fill), controls])
+    let controls = container(row![Space::new().width(Fill), controls])
         .padding(iced::Padding::ZERO.top(30).left(50).right(80))
-        .width(Fill)
+        .width(Fill);
+    let picker: Element<'static, Message> = match amount_picker.filter(|_| enabled) {
+        Some(mode) => container(amount_bar(mode))
+            .padding(
+                iced::Padding::ZERO
+                    .top(65)
+                    .right(if mode == Mode::Words { 20 } else { 50 }),
+            )
+            .align_x(iced::Right)
+            .width(Fill)
+            .into(),
+        None => Space::new().into(),
+    };
+    stack![controls, picker]
+        .height(if enabled && amount_picker.is_some() {
+            95
+        } else {
+            60
+        })
+        .into()
+}
+
+fn mode_control(
+    bytes: &'static [u8],
+    active: bool,
+    mode: Mode,
+    opacity: f32,
+    enabled: bool,
+) -> Element<'static, Message> {
+    let control = control(
+        bytes,
+        active,
+        enabled.then_some(Message::SelectMode(mode)),
+        opacity,
+    );
+    if enabled {
+        mouse_area(control)
+            .on_right_press(Message::ToggleAmountPicker(mode))
+            .into()
+    } else {
+        control
+    }
+}
+
+fn amount_bar(mode: Mode) -> Element<'static, Message> {
+    // Figma Words 103:10 / Times 7:65: 170 x 30, 8px corners,
+    // 20px gaps between labels, with the final three-digit label wider.
+    let choices = row(mode
+        .amounts()
+        .into_iter()
+        .enumerate()
+        .map(|(index, amount)| {
+            button(
+                container(
+                    text(amount.to_string())
+                        .font(theme::FONT)
+                        .size(16)
+                        .line_height(iced::widget::text::LineHeight::Absolute(20.0.into())),
+                )
+                .center_x(if index == 3 { 49 } else { 40 })
+                .center_y(30),
+            )
+            .padding(0)
+            .on_press(Message::SelectAmount(mode, amount))
+            .style(|_, status| button::Style {
+                text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+                    theme::BLUE
+                } else {
+                    theme::CORRECT
+                },
+                ..Default::default()
+            })
+            .into()
+        }));
+    container(choices)
+        .center_x(170)
+        .height(30)
+        .style(|_| container::Style {
+            background: Some(theme::CONTROL_BACKGROUND.into()),
+            border: iced::Border::default().rounded(8),
+            ..Default::default()
+        })
         .into()
 }
 
