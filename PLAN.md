@@ -45,7 +45,7 @@ The implementation agent must read all four guides first. The coordinating agent
    - [x] Run formatting, Clippy, unit tests, and development/release builds where available.
    - [x] Exercise available native GUI behavior, resizing, scrolling, and completion.
    - [x] Compare in-scope rendered geometry and typography with the Figma reference.
-   - [x] Record exact validation evidence and outstanding platform limitations below and in `BUILD.md`.
+   - [x] Record exact validation evidence and outstanding platform limitations below; keep `BUILD.md` focused on reusable commands.
    - [x] Review architectural consistency and update all documentation to reflect the implemented state.
 
 ## Acceptance criteria
@@ -198,8 +198,140 @@ Validation: formatting, strict Clippy, all 29 tests, locked debug/release builds
 - Shared measured geometry supplies glyphs and caret destinations. Immediate text scrolling/recentering is retained, with smooth caret returns across wraps in both directions. Separate clipping keeps the moving caret within the padded panel without restricting it to the new text origin.
 - A separate generation counter distinguishes session resets even for identical target text. Startup, Tab/mode/toggle resets, geometry changes, focus loss, wheel inspection, and the first accepted edit after inspection settle immediately. Terminal completion lets its final movement finish; ignored input preserves inspection. Window resize/scale events restore following even when a capped panel's size is unchanged.
 - Preserved the engine/layout interfaces, synchronous keyboard delivery, countdown semantics, crate version `0.1.0`, solid cyan caret, and the user's 24px setting. No new configuration, controls, dependencies, packaging, push, or publication.
-- Validation: all 41 tests passed (14 library, 25 binary, 2 integration), including 12 new animation/presentation/input tests. Formatting, strict Clippy, locked debug/release builds, and whitespace review are recorded in `BUILD.md`.
+- Validation: all 41 tests passed (14 library, 25 binary, 2 integration), including 12 new animation/presentation/input tests. Formatting, strict Clippy, locked debug/release builds, and whitespace review are recorded in this plan.
 - Native Arch/XWayland captures at 125% scale and 16px/24px fonts recorded intermediate movement, rapid retargeting, forward/backward wraps, restart during movement, resize, and terminal completion. Matching Backspaces restored the exact initial caret after rapid input and 100-event bursts; completed-window pixels were unchanged by further input/Backspace. Native wheel/focus interactions, Windows, native Wayland, physical held-key repeat, and IME remain unverified for this follow-up; deterministic tests cover wheel/focus/countdown policy.
+
+## Archived build-guide evidence — 2026-10-25
+
+
+Always-on movement uses 100 ms and `inOut(1.25)` power easing, centralized in `src/ui/caret.rs`. It uses `std::time::Instant` and Iced native redraw requests; the dependency graph and startup settings are unchanged. The widget retains measured layout during animation, combines movement redraws with countdown deadlines, and keeps keyboard delivery synchronous. See `AGENTS.md` for reset, inspection, and completion behavior.
+
+Automated verification on Arch Linux: all 41 tests passed (14 library, 25 binary, 2 integration). `cargo fmt --all -- --check`, strict Clippy with `--locked --all-targets -- -D warnings`, locked debug/release builds, and `git diff --check` passed; Cargo checks used `CARGO_BUILD_JOBS=2`. New tests cover easing, exact and delayed completion, reversal/rapid retargeting, unchanged-target updates, panel-relative wraps/recentering, identical-text resets, reflow/font size, inspection/no-op behavior, focus/resize handling, terminal completion, countdown scheduling, 1,000 native-message edits and Backspaces, and session-generation policy.
+
+Native XWayland verification at 125% display scale used separate temporary settings directories for 16px and 24px, preserving the repository's `settings.json`. A targeted X11 harness launched test instances of the debug executable, sent events only to those windows, captured successive rendered frames, and extracted the cyan caret position. Both sizes showed intermediate forward/backward movement and smooth line returns without hiding the caret during wraps. Rapid input and a 100-event burst each returned to the exact original caret after matching Backspaces. Captures also exercised Tab during movement, resize from 875 × 500 to 1250 × 750 physical pixels, and completion after 5,000 input events. Additional input and Backspace after completion produced identical window pixels. Motion contact sheets and the completed layout were visually inspected.
+
+Generated evidence is under `target/caret-verification/`: `results.json`, per-scenario `trace.json` files and PNG captures, and `16-motion-sheet.png` / `24-motion-sheet.png`. These are disposable local verification artifacts, not release assets. Capture timestamps include input delivery and capture/compositor overhead; they are not an input latency benchmark. The exact 100 ms interpolation is covered by deterministic tests.
+
+Native manual wheel/focus behavior, physical held-key repeat, IME, Windows, and native Wayland were not verified by this harness. Automated tests cover inspection/focus policy and countdown interaction. Packaging was unimplemented at the time of that check; see the Arch packaging follow-up below.
+
+## Arch build and packaging — 2026-10-26
+
+- Built the current application without changing Rust source, dependencies, version
+  `0.1.0`, or the checkout's 24px font setting. Added reusable
+  `packaging/build-arch.sh`, a local binary PKGBUILD template, desktop launcher,
+  usage instructions, and notice collection. Generated staging stays under
+  `target/packaging/`; final artifacts stay under ignored `dist/`.
+- Both formats carry the same release executable, settings, font OFL notices,
+  word-list provenance, notices for 282 resolved Linux crates (including build
+  dependencies), and Rust standard-library notices. Supplemental crate notices
+  are stored with exact upstream provenance. No application license was invented.
+- The pacman package uses the portable archive as a SHA-256-verified source,
+  installs the executable/settings under `/usr/lib/typerr`, exposes a relative
+  `/usr/bin/typerr` symlink and desktop entry, and declares the settings file in
+  pacman's backup list. Display/graphics dependencies include dynamically loaded
+  libraries beyond the three direct ELF dependencies.
+- Reduced `BUILD.md` from 193 to 65 lines: reusable setup, checks, commands,
+  output paths, and troubleshooting. Historical feature results remain here;
+  the additional smooth-caret evidence previously unique to the build guide is
+  preserved in the preceding section. `PACKAGING.md` now documents both formats.
+
+Validation on native Arch x86_64 with Rust/Cargo 1.98.1:
+
+- Formatting, strict Clippy, all 41 tests (14 library, 25 binary, 2 integration),
+  and locked debug/release builds passed using two Cargo jobs. The complete
+  packaging entry point ran successfully, including makepkg dependency checks.
+- Bash syntax and desktop-entry validation passed. `file` confirmed an x86_64
+  ELF; `ldd` resolved direct dependencies. Package metadata, executable modes,
+  relative symlink, settings backup declaration, and identical payload/notices
+  across formats were checked. Both SHA-256 checks passed; a deliberately
+  corrupted source fixture was rejected by makepkg's checksum validation.
+- Extracted both final artifacts under `/tmp/typerr-packages-6s8h1mzd` and launched
+  each from a separate empty working directory. No host installation was done.
+  The pacman check launched through its extracted `usr/bin/typerr` symlink,
+  exercising executable-adjacent settings lookup.
+- Native XWayland at 125% scale: inspected startup, incorrect text/space marking,
+  and restart screenshots; four rows and the preview fade rendered at 24px.
+  Four targeted X11 keypresses moved the caret 72 physical pixels. Four
+  Backspaces restored identical startup pixels. Tab replaced the text and
+  returned to the first row with `0/50`. Captured caret height was 38 physical
+  pixels, consistent with the configured 30px line height at 125% scale.
+- An initial GUI attempt was denied display access inside the sandbox; the
+  authorized desktop run succeeded. The first test also assumed identical
+  horizontal caret coordinates after Tab; that assertion was corrected because
+  replacement text can legitimately recenter the visible block. The final
+  checks passed for both formats. GUI stdout/stderr logs were empty.
+- Build log: `target/packaging/build.log`; final staging and generated PKGBUILD:
+  `target/packaging/arch.LiJ5DS/`; GUI harness, captures, loaded-library records,
+  checksum rejection, and results: `target/package-verification/`.
+
+Artifacts:
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `dist/typerr-0.1.0-arch-linux-x86_64.tar.gz` | 8,522,479 | `d5ad21b3d1f76d83ce1a80d9373f1438a6115f9f19a2ab15dfe570822648b878` |
+| `dist/typerr-0.1.0-1-x86_64.pkg.tar.zst` | 7,981,905 | `0eca7a35dd4d90e3a2b8f2ed4853b8cf2cd13dadc1752a7b773a2169f1179bf5` |
+
+`dist/SHA256SUMS` contains both artifact hashes. Native Wayland, Windows,
+physical input/IME, clean-machine installation, and pacman upgrade behavior
+remain unverified. No Windows build, host installation, Git push, or publication
+was performed. Recommended packaging follow-up is clean-Arch install/upgrade
+verification and native Wayland testing; future application features remain
+subject to the existing alpha scope.
+
+## Windows MSVC cross-build from Arch — 2026-10-26
+
+- Built version `0.1.0` for `x86_64-pc-windows-msvc` with cargo-xwin 0.23.1,
+  Rust 1.98.1, Clang/LLD 23.1.3, and downloaded Microsoft SDK/CRT libraries
+  (CRT headers report 14.44.35220). No application source, lockfile, dependency,
+  or 24px settings changes were required.
+- Added `packaging/build-windows.sh` and Windows usage text. The script supports
+  normal PATH tools and the project-local tools under `target/windows-tools/`.
+  Signed Arch LLVM packages matching installed LLVM libraries were verified and
+  extracted there; no system packages were installed. The Windows Rust standard
+  library target was added to the pinned rustup toolchain. SDK cache is under
+  `target/xwin/`. An initial rolling-mirror 404 was resolved using Arch's archive;
+  a transient SDK download/DNS error was resolved by retrying from the cache.
+- Static CRT flags are scoped to the Windows target. Final-binary debug stripping
+  and `/DEBUG:NONE` omit PDB output and eliminate LNK4099 warnings about omitted
+  Microsoft runtime debug symbols. No general warning suppression was added.
+- The portable ZIP includes the release executable, current settings, Windows
+  usage instructions, font/word-list/Rust notices, and 208 target-filtered Cargo
+  dependency notices. Added exact-commit supplemental licenses for clipboard-win,
+  gl_generator, and khronos_api, retaining source attribution headers. Both
+  packaging entry points preserve checksum entries for existing platform archives.
+- Updated `BUILD.md` with setup and repeatable Windows build commands, and
+  `PACKAGING.md` with ZIP usage and the cross-build/runtime-verification distinction.
+
+Validation:
+
+- Native formatting, strict Clippy, and all 41 existing Linux tests passed.
+  Windows-target release Clippy with `--all-targets -- -D warnings` passed.
+  The Windows optimized executable built successfully; the final build log has
+  no warnings or errors. Bash syntax and `git diff --check` passed.
+- LLVM inspection confirms AMD64 PE32+ with the Windows GUI subsystem. Its 14
+  direct imported DLLs are Windows system libraries; no VCRUNTIME, MSVCP, MSVCR,
+  UCRTBASE, or api-ms-win-crt dynamic-runtime imports remain. PE header version
+  numbers are not a claim of support for older Windows versions.
+- ZIP CRC and relative-path checks passed. Extracted to a fresh temporary
+  directory; executable and settings match their source bytes, the font size is
+  24px, and all expected license/attribution files are present. All three current
+  Arch/Windows artifact checksums pass; the Arch archives remain unchanged.
+- Final build log: `target/packaging/windows-build.log`; metadata/import evidence:
+  `target/packaging/windows.ut5T2u/`; archive verification record:
+  `target/packaging/windows-verification.json`.
+
+Artifacts:
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `dist/typerr-0.1.0-windows-x86_64.zip` | 6,329,256 | `2f80625d84be5c687dac73cdcc5616f600ed95e762a1ed87612ab349344b88f0` |
+| `target/x86_64-pc-windows-msvc/release/typerr.exe` | 13,868,544 | `40c9a1023cfda8be73cfaf5e662924148cf04193e886f31335fcc4b1418e784f` |
+
+This verifies cross-compilation and package integrity, not native Windows GUI
+behavior. Windows rendering, input, scaling, and browser handoff remain to be
+checked on Windows. No Wine execution, GitHub Actions run, signing, installer,
+Git push, or publication was performed. Native Windows testing is the next
+validation step; application feature scope remains unchanged.
 
 ## Score page follow-up — 2026-10-27
 
@@ -249,3 +381,69 @@ Validation on Arch Linux:
 - Formatting, strict all-target Clippy, locked debug/release builds with two Cargo jobs, and `git diff --check` pass.
 - Native XWayland renderer screenshots at 125% scale verify perfect 60 WPM/100% accuracy, corrected mistakes (88% accuracy), 234 WPM with 354 raw WPM and ten errors in an interval, a 120-second result including idle time, zero-duration results, Retry, and a larger window. The temporary harness uses deterministic production messages and injected monotonic timestamps; this verifies rendering/integration, not physical typing or real-time 120-second waiting. Captures, logs, and the removed harness are under `target/statistics-verification/`.
 - No production debug hooks remain. Windows, native Wayland, physical input/IME, and package regeneration were not tested in this follow-up. Existing unrelated packaging edits are preserved. History/personal-best persistence and target-platform physical-input checks remain future work.
+
+
+## Official release build and app logo — 2026-10-28
+
+Rebuilt the current Typing and measured Score pages, amount selectors, and
+course controls for the requested `v1.0.0` GitHub release. The Cargo/package
+version remains `0.1.0`, and the shipped settings retain 24px. Release wording
+is maintained in `packaging/release-notes.md` and contains only the requested
+user-facing page and shortcut information.
+
+The supplied `assets/icons/typerr-logo.svg` now supplies the embedded 64px
+window icon, the Arch desktop icon, and the six-size Windows executable icon
+(16/32/48/64/128/256px). Linux application identity matches `typerr.desktop`.
+Checked-in native formats can be regenerated with `packaging/generate-icons.sh`;
+ordinary builds need no image conversion tools. Windows resource compilation
+uses LLVM's existing resource compiler, with no new Cargo dependency. Typing
+logic, theme, in-page branding, settings lookup, and version labels are unchanged.
+
+Updated packaging notices for the five Lyon crates whose archives omit their
+license files, using their exact upstream source commits. Packages include
+288 Linux or 214 Windows dependency notice directories. Restored disposable
+local Windows tools from signed Arch archives; SDK download retries eventually
+succeeded without changing system packages.
+
+Automated verification:
+
+- Pinned Rust 1.98.1, two Cargo jobs, formatting, strict native all-target Clippy,
+  all 60 tests (18 library, 40 app/widget, 2 integration), and locked native
+  debug/release builds passed.
+- Windows release-target all-target Clippy and the locked MSVC release build
+  passed. PE headers confirm x86_64 GUI and no dynamic MSVC C-runtime imports.
+  Parsed executable resources and verified all six icon images against the ICO.
+- The Arch executable is native x86_64 ELF with resolved direct libraries.
+  Both archives were extracted to fresh temporary directories and matched the
+  release executable/settings; pacman's symlink, backup metadata, desktop entry,
+  and installed SVG match the portable payload. ZIP CRC/path checks, all notices,
+  executable permissions, script syntax, desktop validation, and checksums passed.
+- Build and archive evidence: `target/packaging/rebuild-2026-10-28/`,
+  `target/packaging/arch.JA8qJg/`, and `target/packaging/windows.FicIL5/`.
+
+Final artifacts:
+
+| File | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `dist/typerr-0.1.0-arch-linux-x86_64.tar.gz` | 8,671,498 | `c8ba18458397a75166efdf084fd9e40f687a6a7f46dd6d11c5736a5a2df500b2` |
+| `dist/typerr-0.1.0-1-x86_64.pkg.tar.zst` | 8,123,957 | `a419d9045d60eb3c2d9f23103be694b45c6cf2de9b08e70a2036b164f97026fb` |
+| `dist/typerr-0.1.0-windows-x86_64.zip` | 6,481,238 | `63ac9c608cbbbeb2c4277ce8445b32a354d965e742c308de3987cfb5edae14a6` |
+
+`dist/SHA256SUMS` covers all three artifacts.
+
+GUI validation and remaining limitations:
+
+- Extracted packages launch outside the checkout on native Arch through XWayland
+  at 125% display scale, using 24px text and four visible rows. The 64px window
+  icon property matches the supplied logo byte-for-byte, and WM_CLASS matches
+  the desktop entry. Screenshot inspection is separate from automated tests.
+- This run's desktop interaction automation was unreliable: window-targeted
+  input changed typing output but Backspace capture did not return to the
+  starting image; focused XTest input also failed to produce reliable captures.
+  Do not treat these attempts as passing typing/Backspace/Tab GUI verification.
+  Existing automated behavior tests pass; physical input needs manual validation.
+- Windows was cross-built and structurally verified, not run on Windows. Native
+  Windows rendering, input, taskbar/Explorer appearance, scaling, and browser
+  handoff remain unverified. Native Wayland, clean-machine package installation,
+  pacman upgrade behavior, and signing are also outside this run's verification.
+  Recommended next validation is a manual smoke test on both target platforms.

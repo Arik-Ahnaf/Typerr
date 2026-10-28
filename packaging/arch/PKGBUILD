@@ -1,0 +1,30 @@
+# Local binary package. build-arch.sh supplies the verified portable archive
+# and replaces the version/checksum placeholders in a generated copy.
+pkgname=typerr
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Native typing practice application'
+arch=('x86_64')
+url='https://github.com/Arik-Ahnaf/Typerr'
+license=('LicenseRef-Typerr-Unspecified')
+depends=('glibc' 'gcc-libs' 'libx11' 'libxcursor' 'libxi' 'libxrandr'
+         'libxkbcommon' 'libxkbcommon-x11' 'wayland' 'libglvnd'
+         'vulkan-icd-loader' 'libxcb')
+optdepends=('xdg-utils: open footer links in the default browser'
+            'vulkan-driver: hardware Vulkan rendering')
+backup=('usr/lib/typerr/settings.json')
+options=('!strip' '!debug')
+source=("typerr-${pkgver}-arch-linux-x86_64.tar.gz")
+sha256sums=('@SHA256@')
+
+package() {
+    local payload="$srcdir/typerr-${pkgver}-arch-linux-x86_64"
+    install -Dm755 "$payload/typerr" "$pkgdir/usr/lib/typerr/typerr"
+    install -Dm644 "$payload/settings.json" "$pkgdir/usr/lib/typerr/settings.json"
+    install -dm755 "$pkgdir/usr/bin" "$pkgdir/usr/share/licenses/typerr"
+    ln -s ../lib/typerr/typerr "$pkgdir/usr/bin/typerr"
+    cp -r "$payload/notices/." "$pkgdir/usr/share/licenses/typerr/"
+    install -Dm644 "$payload/README.md" "$pkgdir/usr/share/doc/typerr/README.md"
+    install -Dm644 "$payload/typerr.desktop" "$pkgdir/usr/share/applications/typerr.desktop"
+    install -Dm644 "$payload/typerr-logo.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/typerr.svg"
+}

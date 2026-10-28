@@ -25,6 +25,19 @@ fn main() -> iced::Result {
     .window(iced::window::Settings {
         size: window_size,
         min_size: Some(window_size),
+        #[cfg(target_os = "linux")]
+        platform_specific: iced::window::settings::PlatformSpecific {
+            application_id: "typerr".into(),
+            ..Default::default()
+        },
+        icon: Some(
+            iced::window::icon::from_rgba(
+                include_bytes!("../assets/icons/typerr-logo.rgba").to_vec(),
+                64,
+                64,
+            )
+            .expect("valid bundled app icon"),
+        ),
         ..Default::default()
     })
     .style(|_, _| iced::theme::Style {

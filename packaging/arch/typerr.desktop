@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Typerr
+Comment=Practice typing with words and timed sessions
+Exec=typerr
+Icon=typerr
+StartupWMClass=typerr
+Terminal=false
+Categories=Education;
+Keywords=typing;keyboard;practice;

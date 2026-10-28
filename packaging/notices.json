@@ -1,0 +1,128 @@
+{
+  "gpu-alloc@0.6.2": {
+    "file": "notices/gpu-alloc-61020bdcb4eb/COPYING",
+    "source": "https://raw.githubusercontent.com/zakarumych/gpu-alloc/61020bdcb4eb04fca6bbf748aeb9570e859236e0/COPYING",
+    "additional_file": "notices/spirv-e91a5debc10c/LICENSE",
+    "selected_license": "Apache-2.0"
+  },
+  "gpu-alloc-types@0.3.1": {
+    "file": "notices/gpu-alloc-types-7ddd1fe576fc/COPYING",
+    "source": "https://raw.githubusercontent.com/zakarumych/gpu-alloc/7ddd1fe576fcfc503347eb97e476a47581479f22/COPYING",
+    "additional_file": "notices/spirv-e91a5debc10c/LICENSE",
+    "selected_license": "Apache-2.0"
+  },
+  "gpu-descriptor@0.3.2": {
+    "file": "notices/gpu-descriptor-bb28b4e55b74/COPYING",
+    "source": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/bb28b4e55b742e0ea3e7a0968e7ee6287ba0e06a/COPYING",
+    "additional_file": "notices/spirv-e91a5debc10c/LICENSE",
+    "selected_license": "Apache-2.0"
+  },
+  "gpu-descriptor-types@0.2.0": {
+    "file": "notices/gpu-descriptor-types-9f2fb9546591/COPYING",
+    "source": "https://raw.githubusercontent.com/zakarumych/gpu-descriptor/9f2fb9546591322e7b77ee1e79385e01effd85e4/COPYING",
+    "additional_file": "notices/spirv-e91a5debc10c/LICENSE",
+    "selected_license": "Apache-2.0"
+  },
+  "hexf-parse@0.2.1": {
+    "file": "notices/CC0-1.0.txt",
+    "source": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt"
+  },
+  "iced_debug@0.14.0": {
+    "file": "notices/iced_debug-3997291f318a/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE"
+  },
+  "iced_futures@0.14.0": {
+    "file": "notices/iced_debug-3997291f318a/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE"
+  },
+  "iced_graphics@0.14.0": {
+    "file": "notices/iced_debug-3997291f318a/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE"
+  },
+  "iced_program@0.14.0": {
+    "file": "notices/iced_debug-3997291f318a/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE"
+  },
+  "iced_renderer@0.14.0": {
+    "file": "notices/iced_debug-3997291f318a/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE"
+  },
+  "iced_runtime@0.14.0": {
+    "file": "notices/iced_debug-3997291f318a/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE"
+  },
+  "iced_wgpu@0.14.0": {
+    "file": "notices/iced_debug-3997291f318a/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/3997291f318a8bc06fa522f5579836fb3feb94df/LICENSE"
+  },
+  "iced_tiny_skia@0.14.1": {
+    "file": "notices/iced_tiny_skia-0ecf60664df7/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/0ecf60664df7b8ac7d7aef5f7279d5323027f693/LICENSE"
+  },
+  "iced_widget@0.14.2": {
+    "file": "notices/iced_widget-54abf81d13fe/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/54abf81d13fec06d4d9ac754b03ce2c3313e8a1f/LICENSE"
+  },
+  "iced_winit@0.14.1": {
+    "file": "notices/iced_winit-38237dd294da/LICENSE",
+    "source": "https://raw.githubusercontent.com/iced-rs/iced/38237dd294da3256c2ac4d3f8288fc73956c91e0/LICENSE"
+  },
+  "profiling@1.0.18": {
+    "file": "notices/profiling-8271551172eb/LICENSE-MIT",
+    "source": "https://raw.githubusercontent.com/aclysma/profiling/8271551172eb6fa4cba47369aedd93790c623df9/LICENSE-MIT"
+  },
+  "spirv@0.3.0+sdk-1.3.268.0": {
+    "file": "notices/spirv-e91a5debc10c/LICENSE",
+    "source": "https://raw.githubusercontent.com/gfx-rs/rspirv/e91a5debc10c395b36db7721dfff6326d697a1e2/LICENSE"
+  },
+  "svg_fmt@0.4.5": {
+    "file": "notices/svg_fmt-93f414cd572b/LICENSE",
+    "source": "https://raw.githubusercontent.com/nical/rust_debug/93f414cd572b5c2781df93dbdc068ed13443d05a/LICENSE"
+  },
+  "zune-core@0.4.12": {
+    "file": "notices/zune-core-f8fbb123d5ed/LICENSE.md",
+    "source": "https://raw.githubusercontent.com/etemesi254/zune-image/f8fbb123d5ed04441e8324a555bfcda0cb1bd28f/LICENSE.md",
+    "additional_file": "notices/spirv-e91a5debc10c/LICENSE",
+    "selected_license": "Apache-2.0"
+  },
+  "zune-jpeg@0.4.21": {
+    "file": "notices/zune-jpeg-fa2c767a01d7/LICENSE.md",
+    "source": "https://raw.githubusercontent.com/etemesi254/zune-image/fa2c767a01d7d9373911d0bf63e0588553d67e0e/LICENSE.md",
+    "additional_file": "notices/spirv-e91a5debc10c/LICENSE",
+    "selected_license": "Apache-2.0"
+  },
+  "clipboard-win@5.4.1": {
+    "file": "notices/clipboard-win-3b27cf2bfd1a/LICENSE",
+    "source": "https://raw.githubusercontent.com/DoumanAsh/clipboard-win/3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342/LICENSE"
+  },
+  "gl_generator@0.14.0": {
+    "file": "notices/gl_generator-ea503e8d5fb6/LICENSE",
+    "source": "https://raw.githubusercontent.com/brendanzab/gl-rs/ea503e8d5fb6d73c6030e6191ce738cd3bf3433e/LICENSE",
+    "attribution_file": "notices/gl_generator-ea503e8d5fb6/ATTRIBUTIONS.txt"
+  },
+  "khronos_api@3.1.0": {
+    "file": "notices/khronos_api-f150967b1c44/LICENSE",
+    "source": "https://raw.githubusercontent.com/brendanzab/gl-rs/f150967b1c44ae888e6676f93f639ebc82771bdc/LICENSE",
+    "attribution_file": "notices/khronos_api-f150967b1c44/ATTRIBUTIONS.txt"
+  },
+  "lyon@1.0.19": {
+    "file": "notices/lyon-56219c95c658/LICENSE-MIT",
+    "source": "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-MIT"
+  },
+  "lyon_algorithms@1.0.22": {
+    "file": "notices/lyon-db98d26a1a90/LICENSE-MIT",
+    "source": "https://raw.githubusercontent.com/nical/lyon/db98d26a1a90076a7a894262dcb51117eef643c8/LICENSE-MIT"
+  },
+  "lyon_geom@1.0.20": {
+    "file": "notices/lyon-db98d26a1a90/LICENSE-MIT",
+    "source": "https://raw.githubusercontent.com/nical/lyon/db98d26a1a90076a7a894262dcb51117eef643c8/LICENSE-MIT"
+  },
+  "lyon_path@1.0.19": {
+    "file": "notices/lyon-56219c95c658/LICENSE-MIT",
+    "source": "https://raw.githubusercontent.com/nical/lyon/56219c95c658d4f39de7b190d98e57d5773ba241/LICENSE-MIT"
+  },
+  "lyon_tessellation@1.0.23": {
+    "file": "notices/lyon-db98d26a1a90/LICENSE-MIT",
+    "source": "https://raw.githubusercontent.com/nical/lyon/db98d26a1a90076a7a894262dcb51117eef643c8/LICENSE-MIT"
+  }
+}

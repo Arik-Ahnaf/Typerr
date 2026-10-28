@@ -43,4 +43,19 @@ fn main() {
     }
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo output directory"));
     fs::write(output.join("dracula.rs"), generated).expect("write compiled Dracula colors");
+    println!("cargo:rerun-if-changed=assets/icons/typerr-logo.ico");
+    println!("cargo:rerun-if-changed=packaging/windows/typerr.rc");
+    println!("cargo:rerun-if-env-changed=LLVM_RC");
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        let resource = output.join("typerr.res");
+        let compiler = env::var_os("LLVM_RC").unwrap_or_else(|| "llvm-rc".into());
+        let status = std::process::Command::new(compiler)
+            .arg("/FO")
+            .arg(&resource)
+            .arg("packaging/windows/typerr.rc")
+            .status()
+            .expect("run llvm-rc to embed the Windows icon (see BUILD.md)");
+        assert!(status.success(), "compile Windows icon resource");
+        println!("cargo:rustc-link-arg-bin=typerr={}", resource.display());
+    }
 }

@@ -1,0 +1,3 @@
+Typerr application code has no declared project license in this checkout.
+This packaging record does not grant additional rights to that code.
+Third-party components retain their respective licenses in this directory.
