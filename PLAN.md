@@ -4,7 +4,7 @@
 
 Current target: **Alpha 0.1**, crate version `0.1.0`.
 
-Deliver native Rust/Iced Main Typing and Score pages with 500-word buffers, responsive input/layout, smooth 100 ms caret movement, and a 300 ms completion crossfade. The Score page uses fixed mock statistics and a native Canvas graph; real scoring is deferred.
+Deliver native Rust/Iced Main Typing and Score pages with 500-word buffers, responsive input/layout, smooth 100 ms caret movement, and a 300 ms completion crossfade. The Score page uses measured WPM, accuracy, raw WPM, consistency, elapsed time, and a native Canvas graph; see the 2026-10-28 scoring follow-up.
 
 The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. The 2026-10-27 score follow-up supersedes the earlier no-navigation rules; Dashboard and Settings remain excluded.
 
@@ -99,7 +99,7 @@ The word list contains exactly 200 original curated words. Keyboard/focus events
 - Arch Linux release launch and the native XWayland checks above passed. Native Wayland and Windows build/runtime verification remain pending.
 - Alpha 0.1 uses a monospaced ASCII English target. Full IME/composition, international word sets, and advanced Unicode shaping are future work unless separately verified.
 - Smooth caret interpolation and line returns are implemented. User-configurable movement, blinking, and animated text scrolling remain future work; duration/easing are centralized for later adjustments.
-- Real score calculations/history, Dashboard, Settings, and configurable durations require later version plans. Mock Score and its Next/Retry controls are implemented by the score follow-up below.
+- Real score calculations and selectable mode amounts are implemented by the follow-ups below. History/personal bests, Dashboard, and Settings remain future work.
 - Installer creation, distribution automation, signing, and publication remain unimplemented; see `PACKAGING.md`.
 
 ## Follow-up: Tab restart and centering
@@ -231,3 +231,21 @@ Validation on Arch Linux:
 - Launched an isolated native XWayland harness at 125% display scale with 16px and 24px typing fonts. Visually inspected Words and Times bars, 25-word and 120-second monitors, and right anchoring in a larger 1000 × 650 logical window. Bars match the reference dimensions, offsets, typography, fill, and corners, independent of typing font size. No new static artwork was needed; existing icons and fonts are reused.
 - Captures and the removed temporary harness are under `target/amount-verification/`. The harness drives application messages and captures the native renderer; widget mouse-event tests are automated and do not establish physical mouse or Windows/Wayland runtime behavior. Native Windows, native Wayland, and physical input remain unverified. No debug hooks remain in production source.
 - Updated agent guidance and both packaging usage documents. Existing unrelated packaging work is preserved. Packages were not rebuilt; no push or publication was performed. Recommended next validation is physical input on the target platforms; real scoring remains a separately authorized follow-up.
+
+
+## Session scoring — 2026-10-28
+
+User-authorized calculations replace the earlier mock-only scope. Added a pure `statistics` library module and frozen `Score` owned by the typing page. Timing begins with the first accepted printable scalar in both modes and includes pauses/focus loss. Word/buffer completion uses the final character timestamp; Time completion uses its exact deadline even when input/redraw arrives late. Score remains frozen through the fade and result-page input. All replacement paths clear measurements, including identical-target Retry.
+
+- WPM = correct retained characters × 12 / elapsed seconds. Raw = all retained characters × 12 / elapsed seconds, displayed as a speed. Spaces/punctuation/numbers count as characters. Corrections remove the deleted character from retained counts.
+- Accuracy = correct printable attempts / all printable attempts × 100; corrected mistakes remain in the attempt/error history. Backspace, ignored controls/shortcuts, and discarded surplus text are excluded from attempts.
+- Consistency = clamp(100 × (1 − population coefficient of variation), 0, 100), using attempted characters/second over one-second intervals, including idle intervals. Weight the final partial interval by its duration. Intervals include their right endpoint, and the first includes time zero. One nonempty interval returns 100%; instantaneous completion returns zero speeds/consistency rather than an undefined value.
+- Graph curves use cumulative retained correct/raw WPM, actual elapsed timestamps and per-interval mistakes. Adaptive axes support all durations/speeds/error counts; long Words tests aggregate to at most 300 graph samples without changing one-second consistency calculations. Removed the fabricated PB line; history/persistence remain excluded.
+- Preserved synchronous keyboard forwarding, engine/layout boundaries, mode amounts, options, and the 300 ms fade. No dependency, lockfile, version, packaging build, push, or publication changes.
+
+Validation on Arch Linux:
+
+- All 60 tests pass (18 library, 40 app/widget, 2 integration). New coverage includes exact speeds, retained mistakes and corrections, Unicode/expected-space errors, accuracy history, weighted partial intervals and idle periods, zero-time/long tests, all four timed deadlines with focus loss, frozen results, discarded surplus input, every replacement path, and adaptive graph coordinates/interpolation.
+- Formatting, strict all-target Clippy, locked debug/release builds with two Cargo jobs, and `git diff --check` pass.
+- Native XWayland renderer screenshots at 125% scale verify perfect 60 WPM/100% accuracy, corrected mistakes (88% accuracy), 234 WPM with 354 raw WPM and ten errors in an interval, a 120-second result including idle time, zero-duration results, Retry, and a larger window. The temporary harness uses deterministic production messages and injected monotonic timestamps; this verifies rendering/integration, not physical typing or real-time 120-second waiting. Captures, logs, and the removed harness are under `target/statistics-verification/`.
+- No production debug hooks remain. Windows, native Wayland, physical input/IME, and package regeneration were not tested in this follow-up. Existing unrelated packaging edits are preserved. History/personal-best persistence and target-platform physical-input checks remain future work.

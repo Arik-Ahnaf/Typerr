@@ -5,7 +5,11 @@ use iced::{
     window,
 };
 use std::time::{Duration, Instant};
-use typerr::{engine::TypingSession, words};
+use typerr::{
+    engine::TypingSession,
+    statistics::{Score, Statistics},
+    words,
+};
 
 const TIME_LIMIT_SECONDS: u64 = 30;
 const WORD_TARGET: usize = 50;
@@ -63,6 +67,9 @@ struct MainTyping {
     time_limit_seconds: u64,
     amount_picker: Option<Mode>,
     deadline: Option<Instant>,
+    started: Option<Instant>,
+    statistics: Statistics,
+    score: Score,
     seconds_remaining: u64,
     /// Changes on accepted edits or explicit session resets, restoring the viewport.
     revision: u64,
@@ -78,10 +85,18 @@ impl MainTyping {
     fn replace(&mut self, target: String) {
         self.session = TypingSession::new(target);
         self.deadline = None;
+        self.started = None;
+        self.statistics = Statistics::default();
+        self.score = Score::default();
         self.seconds_remaining = self.time_limit_seconds;
         self.amount_picker = None;
         self.revision = self.revision.wrapping_add(1);
         self.generation = self.generation.wrapping_add(1);
+    }
+
+    fn elapsed(&self, now: Instant) -> Duration {
+        self.started
+            .map_or(Duration::ZERO, |start| now.saturating_duration_since(start))
     }
 
     fn tick(&mut self, now: Instant) {
@@ -138,6 +153,9 @@ impl Default for App {
                 time_limit_seconds: TIME_LIMIT_SECONDS,
                 amount_picker: None,
                 deadline: None,
+                started: None,
+                statistics: Statistics::default(),
+                score: Score::default(),
                 seconds_remaining: TIME_LIMIT_SECONDS,
                 revision: 0,
                 generation: 0,
@@ -182,6 +200,7 @@ impl App {
     fn finish(&mut self, now: Instant) {
         if self.page == Page::Typing {
             self.main.amount_picker = None;
+            self.main.score = self.main.statistics.finish(self.main.elapsed(now));
             self.page = Page::Transition { started: now, now };
         }
     }
@@ -274,21 +293,42 @@ impl App {
                     return;
                 }
                 let changed = if key == keyboard::Key::Named(keyboard::key::Named::Backspace) {
-                    self.main.session.backspace()
+                    let correct = self
+                        .main
+                        .session
+                        .position()
+                        .checked_sub(1)
+                        .and_then(|i| self.main.session.character_state(i))
+                        == Some(typerr::engine::CharacterState::Correct);
+                    let changed = self.main.session.backspace();
+                    if changed {
+                        self.main
+                            .statistics
+                            .backspace(self.main.elapsed(now), correct);
+                    }
+                    changed
                 } else {
                     let mut changed = false;
                     if let Some(text) = text {
                         for c in text.chars() {
-                            changed |= self.main.session.input(c);
+                            let correct =
+                                self.main.session.target().get(self.main.session.position())
+                                    == Some(&c);
+                            if self.main.session.input(c) {
+                                self.main.started.get_or_insert(now);
+                                self.main.statistics.input(self.main.elapsed(now), correct);
+                                if self.main.mode == Mode::Time && self.main.deadline.is_none() {
+                                    self.main.deadline = Some(
+                                        now + Duration::from_secs(self.main.time_limit_seconds),
+                                    );
+                                }
+                                changed = true;
+                            }
                             if self.finished() {
                                 self.finish(now);
                                 break;
                             }
                         }
-                    }
-                    if changed && self.main.mode == Mode::Time && self.main.deadline.is_none() {
-                        self.main.deadline =
-                            Some(now + Duration::from_secs(self.main.time_limit_seconds));
                     }
                     changed
                 };
@@ -360,10 +400,14 @@ impl App {
         let score: Element<'_, Message> = if self.page == Page::Typing {
             Space::new().into()
         } else {
-            container(crate::ui::score::view(opacity, self.page == Page::Score))
-                .center_x(iced::Fill)
-                .center_y(iced::Fill)
-                .into()
+            container(crate::ui::score::view(
+                &self.main.score,
+                opacity,
+                self.page == Page::Score,
+            ))
+            .center_x(iced::Fill)
+            .center_y(iced::Fill)
+            .into()
         };
         crate::ui::page_host::PageHost::new(
             stack![typing, score, crate::ui::chrome::brand()],
@@ -427,6 +471,9 @@ mod tests {
                 time_limit_seconds: TIME_LIMIT_SECONDS,
                 amount_picker: None,
                 deadline: None,
+                started: None,
+                statistics: Statistics::default(),
+                score: Score::default(),
                 seconds_remaining: TIME_LIMIT_SECONDS,
                 revision: 0,
                 generation: 0,
@@ -434,6 +481,114 @@ mod tests {
             page: Page::Typing,
             focused: true,
             settings: crate::settings::Settings::default(),
+        }
+    }
+
+    #[test]
+    fn score_tracks_corrections_unicode_spaces_and_freezes_at_completion() {
+        let mut app = app("ab c");
+        let start = Instant::now();
+        let send = |app: &mut App, text: &str, seconds| {
+            app.update_at(
+                key(Key::Character("x".into()), Some(text), Modifiers::empty()),
+                start + Duration::from_secs(seconds),
+            )
+        };
+        send(&mut app, "a", 0);
+        send(&mut app, "é", 1);
+        app.update_at(
+            key(Key::Named(Named::Backspace), None, Modifiers::empty()),
+            start + Duration::from_secs(2),
+        );
+        send(&mut app, "b", 3);
+        send(&mut app, "x", 4); // Wrong expected separator counts as a mistake.
+        send(&mut app, "cSURPLUS", 6);
+        let score = app.main.score.clone();
+        assert_eq!(score.elapsed, Duration::from_secs(6));
+        assert_eq!(score.wpm, 6.); // Three correct retained scalars.
+        assert_eq!(score.raw, 8.);
+        assert_eq!(score.accuracy, 60.); // Three correct attempts out of five.
+        assert_eq!(score.samples.iter().map(|s| s.errors).sum::<usize>(), 2);
+        assert_eq!(score.samples.last().unwrap().wpm, score.wpm);
+        send(&mut app, "late", 20);
+        assert_eq!(app.main.score, score);
+        app.update_at(Message::Retry, start + Duration::from_secs(21));
+        assert_eq!(app.main.score, Score::default());
+        assert!(app.main.started.is_none());
+        send(&mut app, "ab", 22);
+        send(&mut app, " c", 24);
+        assert_eq!(app.main.score.accuracy, 100.);
+        assert_eq!(app.main.score.wpm, 24.);
+        assert_eq!(app.main.score.elapsed, Duration::from_secs(2));
+    }
+
+    #[test]
+    fn timed_score_uses_exact_deadline_including_idle_unfocused_time() {
+        for seconds in Mode::Time.amounts() {
+            let mut app = app("abc def");
+            app.main.mode = Mode::Time;
+            app.main.time_limit_seconds = u64::from(seconds);
+            let start = Instant::now();
+            app.update_at(
+                key(Key::Named(Named::Backspace), None, Modifiers::empty()),
+                start,
+            );
+            app.update_at(
+                key(Key::Character("x".into()), Some("\n"), Modifiers::empty()),
+                start,
+            );
+            assert!(app.main.started.is_none());
+            app.update_at(
+                key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+                start,
+            );
+            app.update_at(
+                Message::Native(Event::Window(window::Event::Unfocused)),
+                start + Duration::from_secs(1),
+            );
+            tick(
+                &mut app,
+                start + Duration::from_secs(u64::from(seconds) + 10),
+            );
+            assert_eq!(
+                app.main.score.elapsed,
+                Duration::from_secs(u64::from(seconds))
+            );
+            assert_eq!(app.main.score.wpm, 12. / f64::from(seconds));
+            assert_eq!(app.main.score.accuracy, 100.);
+            assert_eq!(app.main.score.consistency, 0.);
+            assert_eq!(app.main.score.samples.len(), usize::from(seconds));
+        }
+    }
+
+    #[test]
+    fn all_session_replacements_clear_measurements() {
+        for message in [
+            Message::Next,
+            Message::Retry,
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            Message::SelectMode(Mode::Time),
+            Message::ToggleNumbers,
+            Message::TogglePunctuation,
+            Message::SelectAmount(Mode::Words, 10),
+        ] {
+            let mut app = app("abc def");
+            let start = Instant::now();
+            app.update_at(
+                key(Key::Character("x".into()), Some("x"), Modifiers::empty()),
+                start,
+            );
+            if matches!(message, Message::Next | Message::Retry) {
+                app.finish(start + Duration::from_secs(1));
+                tick(&mut app, start + Duration::from_secs(2));
+            }
+            if matches!(message, Message::SelectAmount(..)) {
+                app.main.amount_picker = Some(Mode::Words);
+            }
+            app.update_at(message, start + Duration::from_secs(3));
+            assert!(app.main.started.is_none());
+            assert_eq!(app.main.score, Score::default());
+            assert_eq!(app.main.statistics.finish(Duration::ZERO), Score::default());
         }
     }
 
