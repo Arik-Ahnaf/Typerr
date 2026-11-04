@@ -14,6 +14,8 @@ rustup toolchain install 1.98.1 --profile minimal --component rustfmt --componen
 A graphical session and working graphics drivers are required to run the app.
 See [PACKAGING.md](PACKAGING.md) for runtime libraries and packaging tools.
 Fonts, icons, words, and theme colors are compiled into the executable.
+SQLite is compiled from bundled C sources by `rusqlite`; the existing native C
+compiler setup is required, but no system SQLite development package is needed.
 
 ## Build and check
 
@@ -46,6 +48,11 @@ bash packaging/build-arch.sh
 is needed. The working directory takes precedence over the executable's
 directory. Missing/invalid settings fall back to 16px. Theme JSON changes
 require rebuilding.
+
+Completed tests are saved to the user data directory, independently of the
+working directory and executable location. See [STORAGE.md](STORAGE.md) for the
+database paths, SQL queries, backup guidance, and error log. Tests use temporary
+databases and never write to your real history.
 
 Package outputs and usage are documented in [PACKAGING.md](PACKAGING.md).
 Record dated validation results in [PLAN.md](PLAN.md), not in this guide.

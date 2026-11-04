@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use typerr::{
     engine::TypingSession,
     statistics::{Score, Statistics},
+    storage::{ScoreWriter, TestMode},
     words,
 };
 
@@ -20,11 +21,12 @@ enum Page {
     Typing,
     Transition { started: Instant, now: Instant },
     Score,
+    Dashboard,
 }
 impl Page {
     fn score_opacity(self) -> f32 {
         match self {
-            Self::Typing => 0.0,
+            Self::Typing | Self::Dashboard => 0.0,
             Self::Score => 1.0,
             Self::Transition { started, now } => {
                 let t = (now.saturating_duration_since(started).as_secs_f32()
@@ -53,6 +55,10 @@ impl Mode {
 }
 
 pub struct App {
+    score_writer: Option<ScoreWriter>,
+    dashboard: Option<typerr::storage::DashboardData>,
+    dashboard_reply:
+        Option<std::sync::mpsc::Receiver<typerr::storage::Result<typerr::storage::DashboardData>>>,
     main: MainTyping,
     page: Page,
     focused: bool,
@@ -128,6 +134,8 @@ impl MainTyping {
 #[derive(Debug, Clone)]
 pub enum Message {
     Native(Event),
+    Dashboard,
+    BackToTyping,
     OpenConnection(&'static str),
     SelectMode(Mode),
     ToggleAmountPicker(Mode),
@@ -142,6 +150,9 @@ pub enum Message {
 impl Default for App {
     fn default() -> Self {
         Self {
+            score_writer: None,
+            dashboard: None,
+            dashboard_reply: None,
             main: MainTyping {
                 session: TypingSession::new(words::generate(
                     &mut rand::rng(),
@@ -170,6 +181,7 @@ impl Default for App {
 impl App {
     pub fn new(settings: crate::settings::Settings) -> Self {
         Self {
+            score_writer: ScoreWriter::start_default(),
             settings,
             ..Self::default()
         }
@@ -180,6 +192,16 @@ impl App {
     }
 
     fn advance(&mut self, now: Instant) {
+        if let Some(reply) = &self.dashboard_reply {
+            match reply.try_recv() {
+                Ok(result) => {
+                    self.dashboard = result.ok();
+                    self.dashboard_reply = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => self.dashboard_reply = None,
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            }
+        }
         if self.page == Page::Typing {
             self.main.tick(now);
             if self.main.mode == Mode::Time
@@ -201,6 +223,13 @@ impl App {
         if self.page == Page::Typing {
             self.main.amount_picker = None;
             self.main.score = self.main.statistics.finish(self.main.elapsed(now));
+            if let Some(writer) = &self.score_writer {
+                let (mode, amount) = match self.main.mode {
+                    Mode::Words => (TestMode::Words, self.main.word_target as u16),
+                    Mode::Time => (TestMode::Time, self.main.time_limit_seconds as u16),
+                };
+                writer.save(&self.main.score, mode, amount, self.main.options);
+            }
             self.page = Page::Transition { started: now, now };
         }
     }
@@ -222,6 +251,17 @@ impl App {
         // Enforce the time limit even if an input arrives before a delayed redraw.
         self.advance(now);
         match message {
+            Message::Dashboard if matches!(self.page, Page::Typing | Page::Score) => {
+                self.main.amount_picker = None;
+                self.dashboard = None;
+                self.dashboard_reply = self.score_writer.as_ref().map(ScoreWriter::dashboard);
+                self.page = Page::Dashboard;
+            }
+            Message::BackToTyping if self.page == Page::Dashboard => {
+                self.main.restart();
+                self.dashboard_reply = None;
+                self.page = Page::Typing;
+            }
             Message::Next if self.page == Page::Score => {
                 self.main.restart();
                 self.page = Page::Typing;
@@ -282,6 +322,7 @@ impl App {
                     if !repeat && !modifiers.shift() {
                         self.main.restart();
                         self.page = Page::Typing;
+                        self.dashboard_reply = None;
                     }
                     return;
                 }
@@ -391,6 +432,18 @@ impl App {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
+        if self.page == Page::Dashboard {
+            return crate::ui::page_host::PageHost::new(
+                container(crate::ui::dashboard::view(self.dashboard.as_ref()))
+                    .center_x(iced::Fill)
+                    .center_y(iced::Fill),
+                self.dashboard_reply
+                    .as_ref()
+                    .map(|_| Instant::now() + Duration::from_millis(16)),
+                false,
+            )
+            .into();
+        }
         let opacity = self.page.score_opacity();
         let typing: Element<'_, Message> = if self.page == Page::Score {
             Space::new().width(iced::Fill).height(iced::Fill).into()
@@ -410,7 +463,12 @@ impl App {
             .into()
         };
         crate::ui::page_host::PageHost::new(
-            stack![typing, score, crate::ui::chrome::brand()],
+            stack![
+                typing,
+                score,
+                crate::ui::chrome::brand(),
+                crate::ui::chrome::user_name(!matches!(self.page, Page::Transition { .. }))
+            ],
             if self.page == Page::Typing {
                 self.main.next_tick()
             } else {
@@ -463,6 +521,9 @@ mod tests {
 
     fn app(target: &str) -> App {
         App {
+            score_writer: None,
+            dashboard: None,
+            dashboard_reply: None,
             main: MainTyping {
                 session: TypingSession::new(target),
                 mode: Mode::default(),
@@ -595,6 +656,133 @@ mod tests {
     fn select_amount(app: &mut App, mode: Mode, amount: u16) {
         app.update(Message::ToggleAmountPicker(mode));
         app.update(Message::SelectAmount(mode, amount));
+    }
+
+    #[test]
+    fn completed_tests_save_once_with_frozen_metrics_and_selected_settings() {
+        use typerr::storage::{HistoryFilter, ScoreStore};
+        for (mode, amounts) in [
+            (Mode::Words, Mode::Words.amounts()),
+            (Mode::Time, Mode::Time.amounts()),
+        ] {
+            for amount in amounts {
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("scores.db");
+                let mut app = App {
+                    score_writer: Some(ScoreWriter::start(path.clone()).unwrap()),
+                    ..App::default()
+                };
+                select_amount(&mut app, mode, amount);
+                app.main.options = words::Options {
+                    punctuation: true,
+                    numbers: true,
+                };
+                app.main.replace(vec!["ab,"; 500].join(" "));
+                let start = Instant::now();
+                app.update_at(
+                    key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+                    start,
+                );
+                if mode == Mode::Words {
+                    let rest = format!("b,{}", " ab,".repeat(usize::from(amount) - 1));
+                    app.update_at(
+                        key(Key::Character("x".into()), Some(&rest), Modifiers::empty()),
+                        start + Duration::from_secs(7),
+                    );
+                } else {
+                    // Late input must expire the test before changing the saved score.
+                    app.update_at(
+                        key(Key::Character("x".into()), Some("late"), Modifiers::empty()),
+                        start + Duration::from_secs(u64::from(amount) + 5),
+                    );
+                }
+                let frozen = app.main.score.clone();
+                for _ in 0..3 {
+                    tick(&mut app, start + Duration::from_secs(200));
+                }
+                app.update_at(Message::Next, start + Duration::from_secs(201));
+                app.update_at(
+                    key(Key::Named(Named::Tab), None, Modifiers::empty()),
+                    start + Duration::from_secs(202),
+                );
+                drop(app); // Drain the real queue before reading.
+                let rows = ScoreStore::open(&path)
+                    .unwrap()
+                    .history(HistoryFilter::default())
+                    .unwrap();
+                assert_eq!(rows.len(), 1);
+                let saved = &rows[0].test;
+                assert_eq!(
+                    saved.mode,
+                    if mode == Mode::Words {
+                        TestMode::Words
+                    } else {
+                        TestMode::Time
+                    }
+                );
+                assert_eq!(saved.amount, amount);
+                assert!(saved.punctuation && saved.numbers && saved.completed_at_ms > 0);
+                assert_eq!(saved.wpm, frozen.wpm);
+                assert_eq!(saved.raw_wpm, frozen.raw);
+                assert_eq!(saved.accuracy, frozen.accuracy);
+                assert_eq!(saved.consistency, frozen.consistency);
+                assert_eq!(
+                    saved.elapsed_seconds,
+                    if mode == Mode::Words {
+                        7.
+                    } else {
+                        f64::from(amount)
+                    }
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn abandoned_tests_do_not_save_but_retry_and_cancelled_fade_keep_completed_results() {
+        use typerr::storage::{HistoryFilter, ScoreStore};
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("scores.db");
+        let mut app = app("ab");
+        app.score_writer = Some(ScoreWriter::start(path.clone()).unwrap());
+        let start = Instant::now();
+        let send = |app: &mut App, text, seconds| {
+            app.update_at(
+                key(Key::Character("x".into()), Some(text), Modifiers::empty()),
+                start + Duration::from_secs(seconds),
+            )
+        };
+        send(&mut app, "a", 0);
+        app.update_at(
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            start + Duration::from_secs(1),
+        );
+        app.main.replace("ab".into());
+        send(&mut app, "ab", 2); // Buffer exhaustion; valid zero-duration score.
+        app.update_at(
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            start + Duration::from_secs(2),
+        );
+        assert_eq!(app.page, Page::Typing); // Cancels fade, not the completed record.
+        app.main.replace("ab".into());
+        send(&mut app, "a", 3);
+        send(&mut app, "b", 4);
+        tick(&mut app, start + Duration::from_secs(5));
+        app.update_at(Message::Retry, start + Duration::from_secs(5));
+        send(&mut app, "a", 6);
+        send(&mut app, "b", 8);
+        drop(app);
+        let rows = ScoreStore::open(&path)
+            .unwrap()
+            .history(HistoryFilter::default())
+            .unwrap();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(
+            rows.iter()
+                .map(|r| r.test.elapsed_seconds)
+                .collect::<Vec<_>>(),
+            [0., 1., 2.]
+        );
     }
 
     #[test]
@@ -791,27 +979,108 @@ mod tests {
                 app.update(message);
             }
         };
-        click(&mut app, 597.0, 45.0, mouse::Button::Right);
+        let initial_target = app.main.session.target().to_vec();
+        click(&mut app, 615.0, 45.0, mouse::Button::Left);
+        assert_eq!(app.page, Page::Dashboard);
+        assert_eq!(app.main.generation, 0);
+        assert_eq!(app.main.session.target(), initial_target);
+        click(&mut app, 100.0, 45.0, mouse::Button::Left);
+        assert_eq!(app.page, Page::Typing);
+        assert_eq!(app.main.generation, 1);
+        // The remaining assertions exercise mode menus independently.
+        app.main.generation = 0;
+        click(&mut app, 412.0, 45.0, mouse::Button::Right);
         assert_eq!(app.main.amount_picker, Some(Mode::Words));
         assert_eq!(app.main.generation, 0);
-        click(&mut app, 570.0, 80.0, mouse::Button::Left);
+        click(&mut app, 385.0, 80.0, mouse::Button::Left);
         assert_eq!(app.main.monitor(), "0/25");
         assert_eq!(app.main.generation, 1);
         assert_eq!(app.main.amount_picker, None);
-        click(&mut app, 562.0, 45.0, mouse::Button::Right);
+        click(&mut app, 377.0, 45.0, mouse::Button::Right);
         assert_eq!(app.main.amount_picker, Some(Mode::Time));
-        click(&mut app, 625.0, 80.0, mouse::Button::Left);
+        click(&mut app, 440.0, 80.0, mouse::Button::Left);
         assert_eq!(app.main.monitor(), "120s");
-        click(&mut app, 597.0, 45.0, mouse::Button::Left);
+        click(&mut app, 412.0, 45.0, mouse::Button::Left);
         assert_eq!(app.main.monitor(), "0/25");
         assert_eq!(app.main.amount_picker, None);
         let generation = app.main.generation;
-        click(&mut app, 562.0, 45.0, mouse::Button::Right);
+        click(&mut app, 377.0, 45.0, mouse::Button::Right);
         click(&mut app, 300.0, 200.0, mouse::Button::Left);
         assert_eq!(app.main.amount_picker, None);
         assert_eq!(app.main.generation, generation);
-        click(&mut app, 562.0, 45.0, mouse::Button::Left);
+        click(&mut app, 377.0, 45.0, mouse::Button::Left);
         assert_eq!(app.main.monitor(), "120s");
+        app.page = Page::Score;
+        let generation = app.main.generation;
+        click(&mut app, 615.0, 45.0, mouse::Button::Left);
+        assert_eq!(app.page, Page::Dashboard);
+        assert_eq!(app.main.generation, generation);
+    }
+
+    #[test]
+    fn dashboard_blocks_typing_and_timer_completion_and_returns_to_fresh_test() {
+        let mut app = app("ab cd");
+        let now = Instant::now();
+        app.main.mode = Mode::Time;
+        app.main.time_limit_seconds = 15;
+        app.main.options.numbers = true;
+        app.update_at(
+            key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+            now,
+        );
+        app.main.amount_picker = Some(Mode::Words);
+        app.update_at(Message::Dashboard, now);
+        assert_eq!(app.page, Page::Dashboard);
+        assert_eq!(app.main.amount_picker, None);
+        app.update_at(
+            key(Key::Character("b".into()), Some("b"), Modifiers::empty()),
+            now + Duration::from_secs(20),
+        );
+        assert_eq!(app.main.session.position(), 1);
+        assert_eq!(app.page, Page::Dashboard);
+        app.update_at(Message::BackToTyping, now + Duration::from_secs(20));
+        assert_eq!(app.page, Page::Typing);
+        assert_eq!(app.main.session.position(), 0);
+        assert_eq!(app.main.generation, 1);
+        assert!(app.main.started.is_none());
+        assert!(app.main.deadline.is_none());
+        assert_eq!(app.main.mode, Mode::Time);
+        assert_eq!(app.main.time_limit_seconds, 15);
+        assert!(app.main.options.numbers);
+        app.update_at(Message::Dashboard, now);
+        app.update_at(key(Key::Named(Named::Tab), None, Modifiers::empty()), now);
+        assert_eq!(app.page, Page::Typing);
+        assert_eq!(app.main.generation, 2);
+        app.page = Page::Transition { started: now, now };
+        app.update_at(Message::Dashboard, now);
+        assert!(matches!(app.page, Page::Transition { .. }));
+    }
+
+    #[test]
+    fn dashboard_replies_are_nonblocking_and_failures_clear_stale_data() {
+        let mut app = App::default();
+        app.update(Message::Dashboard);
+        let (sender, receiver) = std::sync::mpsc::channel();
+        app.dashboard_reply = Some(receiver);
+        app.advance(Instant::now());
+        assert!(app.dashboard_reply.is_some());
+        sender
+            .send(Ok(typerr::storage::DashboardData::default()))
+            .unwrap();
+        app.advance(Instant::now());
+        assert!(app.dashboard.is_some());
+        assert!(app.dashboard_reply.is_none());
+        app.update(Message::BackToTyping);
+        app.update(Message::Dashboard);
+        assert!(app.dashboard.is_none());
+        let (sender, receiver) = std::sync::mpsc::channel();
+        app.dashboard_reply = Some(receiver);
+        sender
+            .send(Err(typerr::storage::Error::Invalid("unavailable")))
+            .unwrap();
+        app.advance(Instant::now());
+        assert!(app.dashboard.is_none());
+        assert!(app.dashboard_reply.is_none());
     }
 
     #[test]

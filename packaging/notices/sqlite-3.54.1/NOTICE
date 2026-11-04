@@ -1,0 +1,12 @@
+SQLite 3.54.1, bundled in libsqlite3-sys 0.39.1.
+Source: https://www.sqlite.org/copyright.html
+The following notice is copied from the bundled sqlite3/sqlite3.c header:
+
+2001 September 15
+
+The author disclaims copyright to this source code.  In place of
+a legal notice, here is a blessing:
+
+   May you do good and not evil.
+   May you find forgiveness for yourself and forgive others.
+   May you share freely, never taking more than you give.

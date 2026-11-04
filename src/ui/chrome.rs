@@ -23,7 +23,11 @@ fn control(
     let glyph = icon(bytes, 20.0, 20.0)
         .opacity(opacity)
         .style(move |_, _| svg::Style {
-            color: Some(if active { theme::BLUE } else { theme::CORRECT }),
+            color: Some(if active {
+                theme::CORRECT
+            } else {
+                theme::PENDING
+            }),
         });
     button(container(glyph).center_x(35).center_y(30))
         .padding(0)
@@ -63,6 +67,37 @@ pub fn brand() -> Element<'static, Message> {
     .spacing(8);
     container(brand)
         .padding(iced::Padding::ZERO.top(30).left(50))
+        .into()
+}
+
+/// Shared Dashboard entry point, disabled during the completion fade.
+pub fn user_name(enabled: bool) -> Element<'static, Message> {
+    let account = button(
+        container(
+            text("Eric")
+                .font(theme::USER_FONT)
+                .size(20)
+                .line_height(1.0),
+        )
+        .center_x(70)
+        .center_y(30),
+    )
+    .padding(0)
+    .on_press_maybe(enabled.then_some(Message::Dashboard))
+    .style(|_, status| button::Style {
+        background: Some(theme::CONTROL_BACKGROUND.into()),
+        border: iced::Border::default().rounded(8),
+        text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+            theme::CORRECT
+        } else {
+            theme::PENDING
+        },
+        ..Default::default()
+    });
+    container(account)
+        .padding(iced::Padding::ZERO.top(30).right(50))
+        .align_x(iced::Right)
+        .width(Fill)
         .into()
 }
 
@@ -108,18 +143,17 @@ pub fn header(
         ),
     ]
     .spacing(10);
-    let controls = container(row![Space::new().width(Fill), controls])
-        .padding(iced::Padding::ZERO.top(30).left(50).right(80))
-        .width(Fill);
+    let controls = container(controls)
+        .padding(iced::Padding::ZERO.top(30))
+        .center_x(Fill);
     let picker: Element<'static, Message> = match amount_picker.filter(|_| enabled) {
         Some(mode) => container(amount_bar(mode))
             .padding(
                 iced::Padding::ZERO
                     .top(65)
-                    .right(if mode == Mode::Words { 20 } else { 50 }),
+                    .left(if mode == Mode::Words { 120 } else { 60 }),
             )
-            .align_x(iced::Right)
-            .width(Fill)
+            .center_x(Fill)
             .into(),
         None => Space::new().into(),
     };

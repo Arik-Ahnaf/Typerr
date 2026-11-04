@@ -6,11 +6,11 @@ use iced::widget::{button, canvas, container, row, stack, svg, tooltip};
 use iced::{Element, Point, Rectangle, Renderer, Theme, Vector, mouse};
 use typerr::statistics::Score;
 
-// The right axis fits inside the reference's green slot (150..670).
+// Updated score layout leaves room for the left metrics and right Errors axis.
 const PLOT: Rectangle = Rectangle {
-    x: 150.,
+    x: 170.,
     y: 100.,
-    width: 480.,
+    width: 460.,
     height: 150.,
 };
 fn point(second: f32, value: f32, maximum: f32, duration: f32) -> Point {
@@ -174,7 +174,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
             self.rotated(
                 &mut frame,
                 &number(value),
-                Point::new(130., left.y + 7.),
+                Point::new(150., left.y + 7.),
                 -std::f32::consts::FRAC_PI_2,
                 14.,
             );
@@ -182,7 +182,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
         self.rotated(
             &mut frame,
             "Words per minute",
-            Point::new(105., 233.),
+            Point::new(125., 233.),
             -std::f32::consts::FRAC_PI_2,
             12.,
         );
@@ -242,20 +242,20 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
                 }
             }
         });
-        self.text(&mut frame, "WPM", 30., 100., 24., theme::CORRECT);
+        self.text(&mut frame, "WPM", 50., 100., 24., theme::CORRECT);
         self.text(
             &mut frame,
             &format!("{:.0}", score.wpm),
-            30.,
+            50.,
             130.,
             metric_size(score.wpm, 32.),
             theme::BLUE,
         );
-        self.text(&mut frame, "ACC", 30., 175., 24., theme::CORRECT);
+        self.text(&mut frame, "ACC", 50., 175., 24., theme::CORRECT);
         self.text(
             &mut frame,
             &format!("{:.0}%", score.accuracy),
-            31.,
+            51.,
             205.,
             if score.accuracy.round() >= 100. {
                 28.
@@ -265,12 +265,12 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
             theme::BLUE,
         );
         for (label, value, x) in [
-            ("Raw", format!("{:.0}", score.raw), 160.),
-            ("Consistency", format!("{:.0}%", score.consistency), 244.),
+            ("Raw", format!("{:.0}", score.raw), 180.),
+            ("Consistency", format!("{:.0}%", score.consistency), 264.),
             (
                 "Time",
                 format!("{}s", number(score.elapsed.as_secs_f32())),
-                390.,
+                410.,
             ),
         ] {
             self.text(&mut frame, label, x, 270., 16., theme::CORRECT);
@@ -346,7 +346,7 @@ mod tests {
     #[test]
     fn graph_coordinates_scale_to_duration_and_speed() {
         for duration in [1., 15., 30., 60., 120., 1500.] {
-            assert_eq!(point(0., 240., 240., duration), Point::new(150., 100.));
+            assert_eq!(point(0., 240., 240., duration), Point::new(170., 100.));
             assert_eq!(point(duration, 0., 240., duration), Point::new(630., 250.));
             assert!(duration / tick_step(duration, 8.) <= 8.);
         }

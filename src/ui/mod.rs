@@ -1,5 +1,6 @@
 pub mod caret;
 pub mod chrome;
+pub mod dashboard;
 pub mod page_host;
 pub mod score;
 pub mod theme;

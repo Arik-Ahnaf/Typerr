@@ -1,4 +1,8 @@
 {
+  "libsqlite3-sys@0.39.1": {
+    "attribution_file": "notices/sqlite-3.54.1/NOTICE",
+    "source": "https://www.sqlite.org/copyright.html"
+  },
   "gpu-alloc@0.6.2": {
     "file": "notices/gpu-alloc-61020bdcb4eb/COPYING",
     "source": "https://raw.githubusercontent.com/zakarumych/gpu-alloc/61020bdcb4eb04fca6bbf748aeb9570e859236e0/COPYING",

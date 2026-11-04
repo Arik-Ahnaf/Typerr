@@ -20,7 +20,27 @@ fn main() -> iced::Result {
         include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-Regular.ttf")
             .as_slice(),
     )
+    .font(
+        include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-SemiBoldItalic.ttf")
+            .as_slice(),
+    )
     .default_font(ui::theme::FONT)
+    .font(
+        include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-Italic.ttf")
+            .as_slice(),
+    )
+    .font(
+        include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-Medium.ttf")
+            .as_slice(),
+    )
+    .font(
+        include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-SemiBold.ttf")
+            .as_slice(),
+    )
+    .font(
+        include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-Light.ttf")
+            .as_slice(),
+    )
     .font(include_bytes!("../assets/fonts/Jomhuria/Jomhuria-Regular.ttf").as_slice())
     .window(iced::window::Settings {
         size: window_size,

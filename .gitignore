@@ -19,8 +19,17 @@ Desktop.ini
 !.env.example
 !.env.sample
 *.log
+scores.db
+scores.db-journal
+scores.db-wal
+scores.db-shm
 
-# Alpha 0.1 embeds only the static Regular font; retain its license and README.
+# Embed the static typing, account, and Dashboard faces; retain their license and README.
 /assets/fonts/Google_Sans_Code/*.ttf
 /assets/fonts/Google_Sans_Code/static/*.ttf
 !/assets/fonts/Google_Sans_Code/static/GoogleSansCode-Regular.ttf
+!/assets/fonts/Google_Sans_Code/static/GoogleSansCode-SemiBoldItalic.ttf
+!/assets/fonts/Google_Sans_Code/static/GoogleSansCode-Italic.ttf
+!/assets/fonts/Google_Sans_Code/static/GoogleSansCode-Medium.ttf
+!/assets/fonts/Google_Sans_Code/static/GoogleSansCode-SemiBold.ttf
+!/assets/fonts/Google_Sans_Code/static/GoogleSansCode-Light.ttf

@@ -6,7 +6,7 @@ Current target: **Alpha 0.1**, crate version `0.1.0`.
 
 Deliver native Rust/Iced Main Typing and Score pages with 500-word buffers, responsive input/layout, smooth 100 ms caret movement, and a 300 ms completion crossfade. The Score page uses measured WPM, accuracy, raw WPM, consistency, elapsed time, and a native Canvas graph; see the 2026-10-28 scoring follow-up.
 
-The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. The 2026-10-27 score follow-up supersedes the earlier no-navigation rules; Dashboard and Settings remain excluded.
+The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. The 2026-10-27 score follow-up supersedes the earlier no-navigation rules; Dashboard is authorized by the 2026-11-04 follow-up below; Settings remains excluded.
 
 ## Planning decisions
 
@@ -99,7 +99,7 @@ The word list contains exactly 200 original curated words. Keyboard/focus events
 - Arch Linux release launch and the native XWayland checks above passed. Native Wayland and Windows build/runtime verification remain pending.
 - Alpha 0.1 uses a monospaced ASCII English target. Full IME/composition, international word sets, and advanced Unicode shaping are future work unless separately verified.
 - Smooth caret interpolation and line returns are implemented. User-configurable movement, blinking, and animated text scrolling remain future work; duration/easing are centralized for later adjustments.
-- Real score calculations and selectable mode amounts are implemented by the follow-ups below. History/personal bests, Dashboard, and Settings remain future work.
+- Real score calculations and selectable mode amounts are implemented by the follow-ups below. Completed-test history and personal-best queries are implemented by the 2026-11-03 follow-up; Dashboard UI and Settings remain future work.
 - Installer creation, distribution automation, signing, and publication remain unimplemented; see `PACKAGING.md`.
 
 ## Follow-up: Tab restart and centering
@@ -447,3 +447,123 @@ GUI validation and remaining limitations:
   handoff remain unverified. Native Wayland, clean-machine package installation,
   pacman upgrade behavior, and signing are also outside this run's verification.
   Recommended next validation is a manual smoke test on both target platforms.
+
+## Typing and Score design refresh — 2026-10-29
+
+Inspected current Figma `54:22` / `59:3` design context and screenshots against the supplied updated PNGs. Centered the typing control groups at x=265/y=30 in the 700px window and moved their Words/Time menus to x=325/295 at y=65, following the centered controls on resize. Active icons use foreground and inactive icons use Comment, matching the new reference.
+
+Added the shared 70 × 30 `Eric` account button at top=30/right=50 on Typing and Score. Bundled the already supplied Google Sans Code SemiBoldItalic face (covered by the existing OFL), allowed it through `.gitignore`, and registered it at startup. The button uses Comment text and foreground hover/press text; its Dashboard message intentionally does nothing. It stays visible through the fade and is disabled during transitions. No Dashboard page or persistence was added.
+
+Shifted Score's left metrics and speed-axis labels 20px right, moved the plot start to x=170 while preserving its right Errors axis, and aligned lower statistics at x=180/264/410. Retained measured metrics/graph, existing theme colors, four-row typing viewport, configured font sizing, and completion/reset semantics. Reused all existing SVG artwork. Updated `AGENTS.md`; build/package commands remain unchanged.
+
+Validation on Arch Linux with two Cargo jobs:
+
+- Formatting, strict locked all-target Clippy, all 60 tests, locked debug/release builds, and `git diff --check` passed. Updated native widget-pointer regression coverage for the relocated menus and inert account clicks on both pages; graph coordinate assertions match the new plot geometry.
+- Inspected native XWayland renderer captures at 125% scale with 16px and 24px typing fonts, plus a 1000 × 650 logical window. Confirmed account typography/placement, control/menu alignment, four whole typing rows, Score layout, and menu centering after resize. Score before/after the account message is pixel-identical.
+- Evidence and the removed temporary harness are under `target/design-verification/`. Screenshots use production app-message injection and Iced renderer capture; they do not prove physical pointer/hover behavior. One sandboxed display launch failed; the desktop-authorized rerun succeeded. No verification hooks remain in production source.
+- Native Windows, native Wayland, and physical input/hover remain unverified. Packages were not regenerated, and nothing was pushed or published. Dashboard implementation remains deferred until its design is supplied; target-platform manual interaction checks remain recommended.
+
+
+## SQLite score history — 2026-11-03
+
+Implemented the approved Dashboard data layer without creating the Dashboard.
+`src/storage.rs` and `src/storage/` contain the version-1 SQLite schema,
+parameterized insert/summary/personal-best/history SQL, typed Rust results,
+platform user-data path resolution, and one background writer. `App::new`
+initializes `scores.db`; guarded completion queues a frozen summary exactly once.
+Normal shutdown drains pending writes. Existing score calculation, input, layout,
+UI edits, and settings behavior are preserved.
+
+Completed tests alone contribute to counts, typing time, and arithmetic averages.
+The eight personal-best categories combine options and select one complete row
+by WPM, accuracy, timestamp, then ID. History uses UTC timestamps with optional
+mode/amount and half-open date filters. Existing data is preserved on startup;
+unsupported/corrupt/read-only files are reported, never replaced. Lock waits are
+bounded at 250 ms and failed records are logged, not automatically retried.
+
+Added bundled `rusqlite` and test-only `tempfile`, updated the lockfile, ignored
+local database sidecars, and documented paths/SQL/error handling in `STORAGE.md`
+and the build/package guides. Dashboard UI, profiles, abandoned-test time, and
+historical per-test graph samples remain deferred. No push or release requested.
+
+Validation on Arch Linux with Rust 1.98.1 and two Cargo jobs:
+
+- Formatting, strict locked all-target Clippy, all 73 tests (21 library, 42
+  app/widget, 8 storage integration, 2 layout integration), and locked native
+  debug/release builds passed. Tests cover real temporary SQLite files,
+  fractional values, empty/aggregate/filtered queries, all eight best categories
+  and tie ordering, invalid data, unknown schemas, corrupt/read-only files,
+  bounded lock failure/recovery, queue drain, and completion/reset behavior.
+- An actual second-connection write lock confirms saving returns without waiting
+  on the database; the queued result commits after the caller releases the lock.
+  Repeated redraws, Next/Tab, abandoned attempts, full-buffer exhaustion, cancelled
+  fades, completed retries, and all eight selected amounts have persistence checks.
+- Windows MSVC all-target release Clippy and release cross-build passed using the
+  existing project-local cargo-xwin/LLVM tools. PE inspection confirms x64 GUI,
+  no SQLite DLL, and no dynamic MSVC CRT dependency. Native Linux linkage has no
+  SQLite shared-library dependency.
+- Linux and Windows target-filtered dependency-notice collection passed. Added
+  the embedded SQLite 3.54.1 notice from libsqlite3-sys 0.39.1 and verified its
+  inclusion alongside both Rust wrapper licenses. Evidence is under
+  `target/score-storage-verification/`.
+- `git diff --check` passed and `git check-ignore` confirms the database and all
+  three SQLite sidecar patterns. No actual user history was used by tests.
+- No GUI launch, screenshot inspection, physical input testing, or native Windows
+  execution was performed for this data-only change. Cross-compilation does not
+  establish Windows runtime behavior. Archives were not regenerated; nothing was
+  pushed or published. Recommended follow-up is target-platform runtime validation
+  and, when separately requested, the Dashboard using the prepared queries.
+
+
+## Native Dashboard — 2026-11-04
+
+Implemented Figma Dashboard `86:50` using its design context and screenshot plus
+both supplied PNGs. `src/ui/dashboard.rs` owns the native Canvas cards and WPM
+histogram in the pink placement region, with no pink decoration. The 700 × 400
+composition stays centered when resized. Reused shared branding, compiled colors,
+and the existing Google Sans Code family; bundled the supplied 80px profile SVG
+and the existing Italic, Medium, SemiBold, and Light faces under their OFL notice.
+Profile name Eric, Professional Typist title, joined date, and greeting remain
+hardcoded. Dashboard fonts do not depend on typing font settings.
+
+The account button opens Dashboard from Typing or Score. The Dashboard logo or
+fresh unmodified Tab starts a new typing session with remembered mode/options/
+amounts. Opening closes amount menus and abandons unfinished typing without
+saving it; keyboard edits and timer completion are inactive on Dashboard.
+Navigation remains disabled during the completion fade.
+
+Dashboard reads lifetime statistics, eight winning WPM/accuracy pairs, and an
+all-time test-count histogram from SQLite. Empty or unavailable fields show N/A;
+real zero measurements remain zero. The histogram initially uses twelve 10-WPM
+ranges and widens by multiples of ten for faster results. A parameterized SQL
+aggregate avoids loading all history into memory. Summary, bests, and histogram
+share one read transaction on the existing worker, queued after pending saves.
+The UI polls only while a reply is pending; every opening refreshes and discards
+stale results. Read errors use existing stderr/local-file diagnostics. No new
+crate dependency, schema version, settings writes, profile storage, or networking.
+
+Validation on Arch Linux, Rust 1.98.1, two Cargo jobs:
+
+- Formatting, strict locked all-target Clippy, all 78 tests (21 library, 45 app/
+  widget, 10 storage integration, 2 layout integration), locked debug/release
+  builds, and `git diff --check` passed. Coverage includes native widget pointer
+  navigation, ignored Dashboard edits/expiry, Tab/logo return, fade guards,
+  asynchronous replies, queued-save visibility, N/A versus zero, histogram
+  fractional boundaries, range expansion, and extreme finite stored speeds.
+- Launched a temporary native Iced harness under XWayland at 125% scale. Inspected
+  screenshots with empty, partial, and populated temporary databases at 700 × 400,
+  and a populated Dashboard at 1000 × 650; inspected the return to typing capture.
+  Confirmed profile/brand geometry, font weights, card placement, N/A categories,
+  histogram bins and containment, and centering on resize. Harness uses production
+  application messages and the real background storage read path. Fixtures never
+  touched user history. Evidence: `target/dashboard-verification/`.
+- Windows MSVC all-target release Clippy and release cross-build passed using
+  the existing project-local tools. This is compile evidence, not a Windows
+  runtime or packaging validation.
+- Removed the temporary harness from production sources; its source remains with
+  the evidence. Automated widget-pointer events and renderer captures do not
+  establish physical mouse/keyboard behavior. Native Wayland and native Windows
+  execution remain unverified; manual platform interaction checks are recommended.
+- Existing unrelated checkout edits were preserved. Packages were not regenerated;
+  nothing was committed, pushed, or published. Future profile editing and Settings
+  remain excluded.

@@ -10,7 +10,11 @@ Right-click Words to choose 10, 25, 50, or 100 words; right-click Time to choose
 Defaults are 50 words and 30 seconds; selections last until the app closes.
 Reaching the target opens Score with measured WPM, accuracy, raw WPM, consistency,
 elapsed time, and a performance graph. Corrected mistakes still affect accuracy.
-Results are not saved between sessions.
+Completed results are saved automatically in `$XDG_DATA_HOME/typerr/scores.db`,
+or `~/.local/share/typerr/scores.db` when XDG_DATA_HOME is not an absolute path.
+Abandoned tests are not saved. SQLite is bundled; no separate install is needed.
+Save failures are recorded in `scores-errors.log` beside the database when writable.
+Close Typerr before copying the database for a backup. Click Eric to view Dashboard statistics and all-time WPM ranges. Click the Typerr logo or press Tab to start a new test. Profile details are temporary placeholders.
 Next starts fresh text; Retry repeats the same text. Tab restarts either mode.
 The punctuation and number buttons independently change the generated text.
 

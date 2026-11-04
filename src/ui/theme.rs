@@ -1,6 +1,27 @@
 use iced::{Color, Font};
 
 pub const FONT: Font = Font::with_name("Google Sans Code");
+pub const ITALIC_FONT: Font = Font {
+    style: iced::font::Style::Italic,
+    ..FONT
+};
+pub const MEDIUM_FONT: Font = Font {
+    weight: iced::font::Weight::Medium,
+    ..FONT
+};
+pub const SEMIBOLD_FONT: Font = Font {
+    weight: iced::font::Weight::Semibold,
+    ..FONT
+};
+pub const LIGHT_FONT: Font = Font {
+    weight: iced::font::Weight::Light,
+    ..FONT
+};
+pub const USER_FONT: Font = Font {
+    weight: iced::font::Weight::Semibold,
+    style: iced::font::Style::Italic,
+    ..FONT
+};
 pub const BRAND_FONT: Font = Font::with_name("Jomhuria");
 pub const LINE_HEIGHT: f32 = 20.0;
 pub const INSET: f32 = 20.0;

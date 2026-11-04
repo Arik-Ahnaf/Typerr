@@ -38,12 +38,15 @@ def main():
             if supplement.get("additional_file"):
                 shutil.copyfile(packaging / supplement["additional_file"], target / "LICENSE-APACHE")
                 index.append(f'Selected license: {supplement["selected_license"]}; see LICENSE-APACHE.')
-            if supplement.get("attribution_file"):
-                shutil.copyfile(packaging / supplement["attribution_file"], target / "ATTRIBUTIONS.txt")
         for original in files:
             output = target / original.relative_to(source)
             output.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(original, output)
+        # Embedded native code may have notices outside the crate's license files.
+        supplement = supplements.get(key, {})
+        if supplement.get("attribution_file"):
+            shutil.copyfile(packaging / supplement["attribution_file"], target / "ATTRIBUTIONS.txt")
+            index.append(f'Additional attribution: {supplement["source"]}; see ATTRIBUTIONS.txt.')
         index.append("")
     destination.mkdir(parents=True, exist_ok=True)
     (destination / "THIRD-PARTY.md").write_text("\n".join(index))

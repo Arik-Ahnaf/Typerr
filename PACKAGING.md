@@ -68,6 +68,12 @@ Both artifacts copy the checkout's current settings, presently 24px. Edit
 takes precedence over the executable-adjacent file. Editing installed
 settings requires administrator access. The application never writes settings.
 
+Completed scores are written to the user's data directory, not `/usr/lib/typerr`
+or the extracted application folder. See [STORAGE.md](STORAGE.md) for exact paths.
+Do not package `scores.db`, its SQLite sidecars, or diagnostic logs. Bundled
+SQLite adds no system SQLite runtime dependency; retain the collected rusqlite,
+libsqlite3-sys, and embedded SQLite notices when generating either package.
+
 ## Runtime and included notices
 
 Both formats need a working graphical session and graphics drivers. Dependencies

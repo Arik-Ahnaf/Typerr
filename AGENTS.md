@@ -4,7 +4,7 @@
 
 Typerr is a native Rust typing application inspired by Monkeytype. Responsive input, accurate text layout, and smooth caret movement take priority over feature count. Target platforms are Windows and Arch Linux. Develop through small, independently testable alpha versions.
 
-The current score-page follow-up (`0.1.0`) contains Main Typing and Score pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the blue accent. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; history/persistence, Dashboard, Settings, writing settings, and application networking remain excluded. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
+The current score-page follow-up (`0.1.0`) contains Main Typing, Score, and Dashboard pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the foreground color; inactive icons use Comment. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; completed-test SQLite history and Dashboard read queries are authorized by the 2026-11-03 follow-up. The 2026-11-04 follow-up authorizes the native Dashboard with hardcoded profile data; profile storage, Settings, writing settings, and application networking remain excluded. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
 
 The UI must remain native. Do not add HTML, CSS, JavaScript, webviews, or embedded browsers.
 
@@ -30,7 +30,9 @@ Keep modules small and cohesive. The initial structure is:
 | `src/layout.rs` | Pure measured-cell wrapping, visual lines, character/caret positions, and separator ownership; no Iced dependency |
 | `src/app.rs` | Application state, native events, focus/input policy, mode/countdown/generation-option state, and Main Typing page composition |
 | `src/ui/typing_panel.rs` | Native widget, measured font metrics, glyph/error drawing, viewport, clipping, and scroll interaction |
+| `src/storage.rs`, `src/storage/` | Versioned SQLite schema, typed Dashboard queries, user-data paths, and a background score writer |
 | `src/statistics.rs` | Pure elapsed-time measurements, frozen results, and graph samples; no Iced dependency |
+| `src/ui/dashboard.rs` | Native Dashboard cards, profile placeholder, best results, and all-time WPM histogram |
 | `src/ui/score.rs` | Native Canvas graph, measured score presentation and Next/Retry controls |
 | `src/ui/page_host.rs` | Synchronous keyboard/focus forwarding and page-level countdown/crossfade redraw scheduling |
 | `src/ui/caret.rs` | Monotonic caret animation and panel-relative presentation coordinates, separate from logical input and measured layout |
@@ -72,7 +74,7 @@ The page also owns a session-generation counter, incremented only when replacing
 
 Primary reference: [Typerr Figma](https://www.figma.com/design/80x3SZRgeqDp8xOz7FzGdU/Typerr?node-id=0-1), current frame `54:22`, text `54:28`, counter `71:5`. `design_references/Typing Page.png` is the current rendered reference; the older Outline file marks layout areas only.
 
-References whose frame or image name ends in “Outline” use colorful rectangles only to mark general layout areas. Preserve their placement and spacing, but do not render those rectangle fills or borders as decoration. The typing panel is transparent and borderless over background `#282A36`, using Google Sans Code Regular 16px and reference foreground `#F8F8F2`. Use the bundled Jomhuria Regular at 48px for branding, `#44475A` control groups, and `#0088FF` for the selected mode, enabled features, and counter/timer. The counter counts target words whose final character has been entered, regardless of correctness, and decreases when Backspace removes that character. In Words mode the display reaches the selected target (for example, 25/25) and immediately begins the score transition; Backspace can reduce progress only before completion. Tab resets it. In Time mode the same location displays the remaining seconds, from the selected duration to `0s`. Footer connections open the OS browser at https://github.com/Arik-Ahnaf/Typerr (Github), https://x.com/ArikAhnaf1 (Twitter), and https://discord.gg/FYehF2KCw4 (Discord); version/theme labels are informational. This user clarification supersedes the initial interpretation of the cyan panel rectangle.
+References whose frame or image name ends in “Outline” use colorful rectangles only to mark general layout areas. Preserve their placement and spacing, but do not render those rectangle fills or borders as decoration. The typing panel is transparent and borderless over background `#282A36`, using Google Sans Code Regular 16px and reference foreground `#F8F8F2`. Use the bundled Jomhuria Regular at 48px for branding, `#44475A` control groups, and `#0088FF` for the counter/timer; foreground for selected modes/enabled features and Comment for inactive controls. The counter counts target words whose final character has been entered, regardless of correctness, and decreases when Backspace removes that character. In Words mode the display reaches the selected target (for example, 25/25) and immediately begins the score transition; Backspace can reduce progress only before completion. Tab resets it. In Time mode the same location displays the remaining seconds, from the selected duration to `0s`. Footer connections open the OS browser at https://github.com/Arik-Ahnaf/Typerr (Github), https://x.com/ArikAhnaf1 (Twitter), and https://discord.gg/FYehF2KCw4 (Discord); version/theme labels are informational. This user clarification supersedes the initial interpretation of the cyan panel rectangle.
 
 Interaction defaults, not separately specified by the Figma placeholder: pending `#6272A4`, correct `#F8F8F2`, incorrect `#FF5555`, and thin caret `#8BE9FD`. Base colors are opaque; preview opacity is an additional multiplier. Use `assets/fonts/Google_Sans_Code/static/GoogleSansCode-Regular.ttf` and preserve its OFL notice. Bundle `assets/fonts/Jomhuria/Jomhuria-Regular.ttf` with its OFL notice and embed the supplied SVGs. `src/ui/chrome.rs` owns the native header/footer composition.
 
@@ -88,7 +90,7 @@ Before delivery, review all acceptance criteria, architecture boundaries, test r
 
 ## Dracula palette source
 
-`themes/dracula.json` is the color source of truth, copied from `design_references/Dracula Color Pallet.png`. Preserve the image's Current Line value `#6272A4`. Its separate blue accent retains the explicitly requested mode/counter color. The JSON maps UI roles to palette names; `build.rs` validates the hex values and mappings using build-only `serde_json` and generates native color constants imported by `src/ui/theme.rs`. JSON edits require rebuilding; there is no runtime filesystem dependency or theme selector. SVG tinting uses the same constants. The footer displays the theme's JSON name.
+`themes/dracula.json` is the color source of truth, copied from `design_references/Dracula Color Pallet.png`. Preserve the image's Current Line value `#6272A4`. Its separate blue accent retains the counter/timer color. The JSON maps UI roles to palette names; `build.rs` validates the hex values and mappings using build-only `serde_json` and generates native color constants imported by `src/ui/theme.rs`. JSON edits require rebuilding; there is no runtime filesystem dependency or theme selector. SVG tinting uses the same constants. The footer displays the theme's JSON name.
 
 ## Startup settings
 
@@ -100,14 +102,67 @@ Figma Score frame `59:3` and graph template `94:66`, plus the two corresponding 
 
 `Score` in `src/statistics.rs` is the completed-session source of truth. Start monotonic timing on the first accepted printable scalar in either mode, keep idle/unfocused time, and freeze at the completion character or exact Time deadline (before the fade). WPM = retained correct scalars / 5 / elapsed minutes; Raw = all retained scalars / 5 / elapsed minutes, displayed as WPM rather than a percentage. Include spaces, punctuation, and numbers. Backspace removes the deleted scalar from these retained counts. Accuracy = correct printable attempts / all printable attempts * 100; deleting mistakes does not erase their accuracy/error history, and Backspace/control/shortcut/no-op events are not attempts. Consistency = clamp(100 * (1 - population standard deviation / mean), 0, 100) of attempted characters/second over one-second intervals, including idle intervals; weight the final partial interval by its duration. The first interval includes time zero and all intervals include their right endpoint. A single interval has 100% consistency; zero elapsed time has zero speeds/consistency and an empty graph, avoiding division by zero. Every session replacement clears all measurements.
 
-The graph plots cumulative retained correct/raw WPM and mistake counts per interval. Normally sample each second plus the actual final partial interval; cap long Words tests at 300 graph samples by using wider intervals, while consistency still uses one-second intervals. Use actual elapsed X coordinates, adaptive speed/error axes, shape-preserving curves, and no fabricated PB guide. History and personal-best storage remain out of scope. Score typography stays independent of typing font size; fit wider measured values within the existing composition. No new dependency is required.
+The graph plots cumulative retained correct/raw WPM and mistake counts per interval. Normally sample each second plus the actual final partial interval; cap long Words tests at 300 graph samples by using wider intervals, while consistency still uses one-second intervals. Use actual elapsed X coordinates, adaptive speed/error axes, shape-preserving curves, and no fabricated PB guide. Completed-test history and personal-best queries are persisted through the storage module; historical graph samples remain out of scope. Score typography stays independent of typing font size; fit wider measured values within the existing composition. The scoring calculations require no new dependency; persistence uses bundled `rusqlite`.
 
 App owns explicit Typing/Transition/Score state. The 300 ms crossfade uses monotonic elapsed time and smoothstep easing; multiply all outgoing/incoming primitive opacity, including typing preview alpha, while keeping the background/brand steady. Retain the outgoing typing widget through the fade and disable its edits/wheel interaction. PageHost forwards keyboard/focus synchronously and requests frames only during transitions or at countdown deadlines; the typing widget still handles caret redraws and local focus/resize events. Delayed redraws catch up. Stop processing a committed-text event as soon as its accepted character completes the test. Next, Retry, and Tab increment session generation even when the target is unchanged.
 
 ## Mode amount selectors
 
-Figma Words `103:10` and Times `7:65` under Typing Page `54:22` define native 170 × 30 bars with 8px corners, control-background fill, and Google Sans Code 16px / 20px labels. At 700px width, Words begins at (510, 65) and Times at (480, 65); preserve their right offsets when resizing. Both reuse existing compiled theme/font assets.
+Figma Words `103:10` and Times `7:65` under Typing Page `54:22` define native 170 × 30 bars with 8px corners, control-background fill, and Google Sans Code 16px / 20px labels. At 700px width, Words begins at (325, 65) and Times at (295, 65); both follow the centered mode controls when resizing. Both reuse existing compiled theme/font assets.
 
 Right-clicking a mode toggles its bar without changing the active course. Words offers 10/25/50/100; Time offers 15/30/60/120 seconds. Choosing a value activates that mode and starts a fresh session even if the value is unchanged. Each mode remembers its latest value for the current app run, including through Tab, generation toggles, mode changes, Next, and Retry. Left-clicking another mode starts it with its remembered amount; left-clicking the active mode retains the session. No settings writes or persistence across app launches.
 
 Only one bar is open at a time. Selection, outside click, Escape, accepted typing/Backspace, session replacement, focus loss, or completion closes it. Background/footer clicks dismiss without activating underlying controls; header controls remain available. Opening/dismissing preserves input, timer, edit revision, and session generation; a running timer continues. Pointer actions remain disabled during the score transition. The 500-token generation buffer remains unchanged; selected amounts determine the measured test duration and completion boundary.
+
+## Refreshed page chrome — 2026-10-29
+
+Figma frames `54:22` and `59:3` now place a shared 70 × 30 account button 50px from the right and 30px from the top. Display hardcoded `Eric` with bundled Google Sans Code SemiBoldItalic at 20px, an 8px corner radius, control background, and Comment text changing to foreground on hover/press. Clicking opens Dashboard (authorized 2026-11-04). Disable pointer actions during the fade while keeping the account visible with the shared brand.
+
+The typing control groups form a centered 170 × 30 row at y=30 (x=265 at 700px); amount menus retain their 170 × 30 size at y=65. Score metrics begin at x=50, the speed-axis title at x=125, tick labels at x=150, and the plot at x=170; retain room for the Errors axis at the right. Lower statistics begin at x=180/264/410. Preserve measured data, the four-row typing viewport, configured font sizing, and all existing completion/input policies.
+
+
+## Completed score history — 2026-11-03
+
+Read `STORAGE.md` before changing persistence. `scores.db` lives under the user's
+Linux XDG data directory (HOME fallback) or Windows LocalAppData, never beside an
+installed executable. `App::new` initializes the store; `App::default` stays free
+of filesystem side effects. Keep `statistics.rs` pure. Save one frozen summary
+at the guarded Typing-to-Transition boundary; use one background writer and drain
+its queue on normal shutdown. Do not save abandoned tests, profile fields, target
+text, or graph samples. Retry completion creates a distinct test.
+
+Use the checked-in parameterized SQL, schema version 1, and transactional
+initialization. Never overwrite corrupt/unsupported databases. Report storage
+failures to stderr and the writable local log while preserving typing behavior.
+Dashboard averages are per completed test, duration sums only completed tests,
+and personal bests combine all options within each mode/amount; accuracy comes
+from the winning WPM row. Keep tests isolated from actual user history. SQLite is
+bundled through `rusqlite`; `tempfile` is test-only. Preserve dependency notices
+and Windows cross-build checks when changing storage dependencies.
+
+
+## Dashboard — 2026-11-04
+
+Figma `86:50` and `design_references/Dashboard Page.png` define the centered
+700 × 400 page. The pink 620 × 100 area at (40, 275) is only chart placement;
+render a transparent native Canvas histogram from `All time wpm bar chart.png`.
+Reuse the shared brand and compiled palette. Bundle the supplied profile circle
+SVG and existing Google Sans Code Italic/Medium/SemiBold/Light font faces with
+OFL coverage. Profile name Eric, title, joined date, and greeting are hardcoded.
+Dashboard typography is independent of typing font settings.
+
+Account clicks from Typing or Score open Dashboard; ignore them during fades.
+Entering closes amount menus, abandons an unfinished test without saving it, and
+stops its countdown. The brand button or an unmodified fresh Tab returns to a
+new typing session with remembered mode, amounts, and options. Dashboard ignores
+printable text and Backspace. Do not silently resume an expired hidden timer.
+
+Read the lifetime summary, eight mode/amount bests, and histogram in one read
+transaction on the existing storage worker, ordered after queued saves. Never
+block the UI on SQLite. Poll only while a reply is pending; replace stale data on
+each opening. Read failures are logged through the existing storage diagnostics.
+Show N/A for absent metrics/categories, empty history, or failed reads, while
+preserving real zero values. Best accuracy belongs to its winning WPM row.
+The histogram counts all completed tests in twelve ranges, initially 0–9 through
+110–119, widening in multiples of ten to include higher speeds. No history rows
+or profile values are fabricated. No new dependency or schema migration.
