@@ -3,7 +3,7 @@ use super::{chrome, theme};
 use crate::app::Message;
 use canvas::{Frame, Path, Stroke, Text};
 use iced::advanced::text::{self as native_text, Paragraph};
-use iced::widget::{button, canvas, container, responsive, stack, svg, tooltip};
+use iced::widget::{button, canvas, container, responsive, stack, svg, text, tooltip};
 use iced::{Element, Font, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 use typerr::storage::{DashboardData, TestMode};
 
@@ -254,17 +254,6 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
                 },
             );
         }
-        scaled_text(
-            &mut frame,
-            Text {
-                content: "Good Afternoon, Eric".into(),
-                position: Point::new(390., 37.),
-                size: 20.into(),
-                font: theme::USER_FONT,
-                color: theme::ORANGE,
-                ..Text::default()
-            },
-        );
         let summary = self
             .data
             .map(|data| &data.summary)
@@ -384,16 +373,21 @@ pub fn view(data: Option<&DashboardData>) -> Element<'_, Message> {
         )))
         .width(80. * content)
         .height(80. * content);
-        let brand_origin = scale.point(Point::new(50., 30.));
+        let greeting = container(
+            text("Good Afternoon, Eric")
+                .font(theme::USER_FONT)
+                .size(20)
+                .line_height(1.25)
+                .color(theme::ORANGE),
+        )
+        .width(iced::Fill)
+        .align_x(iced::Right)
+        .padding(iced::Padding::ZERO.top(37).right(70));
         let home = tooltip(
-            button(
-                iced::widget::Space::new()
-                    .width(124. * content)
-                    .height(40. * content),
-            )
-            .padding(0)
-            .on_press(Message::BackToTyping)
-            .style(|_, _| button::Style::default()),
+            button(iced::widget::Space::new().width(124).height(40))
+                .padding(0)
+                .on_press(Message::BackToTyping)
+                .style(|_, _| button::Style::default()),
             "New test (Tab)",
             tooltip::Position::Bottom,
         );
@@ -401,13 +395,14 @@ pub fn view(data: Option<&DashboardData>) -> Element<'_, Message> {
             canvas(DashboardCanvas { data })
                 .width(iced::Fill)
                 .height(iced::Fill),
-            chrome::scaled_brand(content, brand_origin),
+            chrome::brand(),
+            greeting,
             container(avatar).padding(
                 iced::Padding::ZERO
                     .left(avatar_center.x - 40. * content)
                     .top(avatar_center.y - 40. * content)
             ),
-            container(home).padding(iced::Padding::ZERO.left(brand_origin.x).top(brand_origin.y)),
+            container(home).padding(iced::Padding::ZERO.left(50).top(30)),
         ]
         .width(iced::Fill)
         .height(iced::Fill)

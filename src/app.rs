@@ -1021,10 +1021,10 @@ mod tests {
             (iced::Size::new(700., 900.), iced::Point::new(150., 95.)),
         ] {
             app.page = Page::Dashboard;
-            // Clicking the old unscaled location must not activate the moved logo.
-            click_at_size(&mut app, 55., 35., mouse::Button::Left, size);
-            assert_eq!(app.page, Page::Dashboard);
+            // The formerly scaled logo location must no longer activate Home.
             click_at_size(&mut app, point.x, point.y, mouse::Button::Left, size);
+            assert_eq!(app.page, Page::Dashboard);
+            click_at_size(&mut app, 100., 45., mouse::Button::Left, size);
             assert_eq!(app.page, Page::Typing);
         }
     }

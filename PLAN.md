@@ -594,3 +594,21 @@ Screenshots use production messages and temporary databases, not personal histor
 Physical input, native Wayland, and native Windows remain unverified. No package
 regeneration or Git push was performed for this correction. Recommended follow-up
 remains manual interaction checks on the target platforms.
+
+## Fixed Dashboard header — 2026-11-04
+
+The user's clarification supersedes header scaling above: only Dashboard body
+content scales. Restored the shared brand to its original fixed dimensions at
+left=50/top=30 and a fixed 124 × 40 Home target. Moved the greeting from the
+scaled Canvas into native header text, fixed at 20px and top=37/right=70.
+Profile cards, statistics, avatar, and histogram retain responsive scaling.
+
+Validation: formatting, strict all-target Clippy, all 78 tests, and locked native
+debug/release builds passed. Updated existing widget-pointer coverage so Home
+activates at its fixed position across wide/tall windows and the formerly scaled
+positions do not. Inspected native XWayland minimum and large-window captures;
+logo and right-anchored greeting crops are pixel-identical between 875 × 500 and
+1910 × 1040 physical-pixel captures at 125% scale. Evidence and the removed
+harness are under `target/dashboard-fixed-header-verification/`; only temporary
+fixture databases were used. Physical input, native Wayland, and native Windows
+remain unverified. No push or package rebuild was performed.

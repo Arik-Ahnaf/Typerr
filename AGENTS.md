@@ -146,8 +146,10 @@ and Windows cross-build checks when changing storage dependencies.
 Figma `86:50` and `design_references/Dashboard Page.png` define the
 700 × 400 reference layout. Dashboard fills the available window, up to the
 entire screen: scale card/chart geometry and positions with each window axis,
-and scale text, the brand, and profile artwork uniformly by the smaller ratio.
-Keep the avatar circular and the brand hit target aligned at every window size.
+and scale body text and profile artwork uniformly by the smaller ratio.
+Keep the avatar circular. Header branding stays at its original fixed size,
+50px from the left and 30px from the top, with a fixed 124 × 40 Home hit target.
+The greeting stays 20px at top=37/right=70. Neither header element scales.
 Do not cap Dashboard at 700 × 400 or add outer centering margins. The pink 620 × 100 area at (40, 275) is only chart placement;
 render a transparent native Canvas histogram from `All time wpm bar chart.png`.
 Reuse the shared brand and compiled palette. Bundle the supplied profile circle
