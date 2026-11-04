@@ -567,3 +567,30 @@ Validation on Arch Linux, Rust 1.98.1, two Cargo jobs:
 - Existing unrelated checkout edits were preserved. Packages were not regenerated;
   nothing was committed, pushed, or published. Future profile editing and Settings
   remain excluded.
+
+## Dashboard window scaling correction — 2026-11-04
+
+Removed the fixed centered 700 × 400 Dashboard surface. The native responsive
+view now fills the available client area without an application-level maximum.
+Card/chart geometry, margins, and label positions scale with the window's width
+and height relative to the reference. Text, shared brand artwork, and avatar
+scale uniformly by the smaller ratio, preserving glyph proportions and a circular
+avatar. The logo's button moves and scales with its visible artwork. Typing and
+Score retain their existing sizing. No persistence or navigation semantics changed.
+
+Validation: formatting, strict locked all-target Clippy, all 78 tests, and locked
+native debug/release builds passed. Extended native widget-pointer coverage to
+1400 × 800, 1920 × 1080, and 700 × 900 layouts: the resized logo activates Home,
+and its old unscaled position does not. Inspected XWayland renderer captures at
+700 × 400, 1000 × 650, 1400 × 800, tall, and desktop-constrained maximum window
+sizes, with empty/partial/populated fixtures; text and artwork remain undistorted,
+chart/card bounds fill the window with scaled design margins, and the minimum
+size populated image is pixel-identical to the previous implementation. The
+compositor capped tall/1920 × 1080 requests at 1040 physical pixels high; largest
+capture is 1910 × 1040 physical pixels at 125% desktop scaling. Evidence and the
+removed temporary harness: `target/dashboard-scaling-verification/`.
+
+Screenshots use production messages and temporary databases, not personal history.
+Physical input, native Wayland, and native Windows remain unverified. No package
+regeneration or Git push was performed for this correction. Recommended follow-up
+remains manual interaction checks on the target platforms.

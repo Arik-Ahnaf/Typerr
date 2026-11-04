@@ -143,8 +143,12 @@ and Windows cross-build checks when changing storage dependencies.
 
 ## Dashboard — 2026-11-04
 
-Figma `86:50` and `design_references/Dashboard Page.png` define the centered
-700 × 400 page. The pink 620 × 100 area at (40, 275) is only chart placement;
+Figma `86:50` and `design_references/Dashboard Page.png` define the
+700 × 400 reference layout. Dashboard fills the available window, up to the
+entire screen: scale card/chart geometry and positions with each window axis,
+and scale text, the brand, and profile artwork uniformly by the smaller ratio.
+Keep the avatar circular and the brand hit target aligned at every window size.
+Do not cap Dashboard at 700 × 400 or add outer centering margins. The pink 620 × 100 area at (40, 275) is only chart placement;
 render a transparent native Canvas histogram from `All time wpm bar chart.png`.
 Reuse the shared brand and compiled palette. Bundle the supplied profile circle
 SVG and existing Google Sans Code Italic/Medium/SemiBold/Light font faces with

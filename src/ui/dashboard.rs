@@ -3,11 +3,48 @@ use super::{chrome, theme};
 use crate::app::Message;
 use canvas::{Frame, Path, Stroke, Text};
 use iced::advanced::text::{self as native_text, Paragraph};
-use iced::widget::{button, canvas, container, stack, svg, tooltip};
+use iced::widget::{button, canvas, container, responsive, stack, svg, tooltip};
 use iced::{Element, Font, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 use typerr::storage::{DashboardData, TestMode};
 
 const NA: &str = "N/A";
+
+/// Stretch the design layout to the viewport; keep glyphs and artwork undistorted.
+#[derive(Clone, Copy)]
+struct Scale {
+    x: f32,
+    y: f32,
+}
+impl Scale {
+    fn new(size: Size) -> Self {
+        Self {
+            x: (size.width / 700.).max(0.001),
+            y: (size.height / 400.).max(0.001),
+        }
+    }
+    fn content(self) -> f32 {
+        self.x.min(self.y)
+    }
+    fn point(self, point: Point) -> Point {
+        Point::new(point.x * self.x, point.y * self.y)
+    }
+    fn vector(self) -> Vector {
+        Vector::new(self.x, self.y)
+    }
+    fn inverse(self) -> Vector {
+        Vector::new(1. / self.x, 1. / self.y)
+    }
+}
+
+fn scaled_text(frame: &mut Frame, mut text: Text) {
+    let scale = Scale::new(frame.size());
+    text.position = scale.point(text.position);
+    text.size = (text.size.0 * scale.content()).into();
+    frame.with_save(|frame| {
+        frame.scale_nonuniform(scale.inverse());
+        frame.fill_text(text);
+    });
+}
 
 fn metric(value: Option<f64>, percent: bool) -> String {
     value.map_or_else(
@@ -59,25 +96,31 @@ fn fitted_size(content: &str, font: Font, size: f32, width: f32) -> f32 {
 }
 
 fn label(frame: &mut Frame, value: &str, rect: Rectangle, size: f32, font: Font) {
-    frame.fill_text(Text {
-        content: value.into(),
-        position: Point::new(rect.center_x(), rect.y),
-        size: fitted_size(value, font, size, rect.width).into(),
-        font,
-        color: theme::CORRECT,
-        align_x: iced::alignment::Horizontal::Center.into(),
-        line_height: native_text::LineHeight::Relative(1.25),
-        ..Text::default()
-    });
+    scaled_text(
+        frame,
+        Text {
+            content: value.into(),
+            position: Point::new(rect.center_x(), rect.y),
+            size: fitted_size(value, font, size, rect.width).into(),
+            font,
+            color: theme::CORRECT,
+            align_x: iced::alignment::Horizontal::Center.into(),
+            line_height: native_text::LineHeight::Relative(1.25),
+            ..Text::default()
+        },
+    );
 }
 
 fn rotated(frame: &mut Frame, value: &str, position: Point, size: f32, font: Font) {
+    let scale = Scale::new(frame.size());
+    let position = scale.point(position);
     frame.with_save(|frame| {
+        frame.scale_nonuniform(scale.inverse());
         frame.translate(Vector::new(position.x, position.y));
         frame.rotate(-std::f32::consts::FRAC_PI_2);
         Text {
             content: value.into(),
-            size: size.into(),
+            size: (size * scale.content()).into(),
             font,
             color: theme::CORRECT,
             ..Text::default()
@@ -182,6 +225,7 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
         _: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
+        frame.scale_nonuniform(Scale::new(bounds.size()).vector());
         for (x, y, h) in [
             (40., 75., 100.),
             (360., 75., 100.),
@@ -198,23 +242,29 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
             ("Professional Typist", 122., 14., theme::ITALIC_FONT),
             ("Joined 4th January, 2026", 140., 10., theme::FONT),
         ] {
-            frame.fill_text(Text {
-                content: value.into(),
-                position: Point::new(140., y),
-                size: size.into(),
-                font,
-                color: theme::CORRECT,
-                ..Text::default()
-            });
+            scaled_text(
+                &mut frame,
+                Text {
+                    content: value.into(),
+                    position: Point::new(140., y),
+                    size: size.into(),
+                    font,
+                    color: theme::CORRECT,
+                    ..Text::default()
+                },
+            );
         }
-        frame.fill_text(Text {
-            content: "Good Afternoon, Eric".into(),
-            position: Point::new(390., 37.),
-            size: 20.into(),
-            font: theme::USER_FONT,
-            color: theme::ORANGE,
-            ..Text::default()
-        });
+        scaled_text(
+            &mut frame,
+            Text {
+                content: "Good Afternoon, Eric".into(),
+                position: Point::new(390., 37.),
+                size: 20.into(),
+                font: theme::USER_FONT,
+                color: theme::ORANGE,
+                ..Text::default()
+            },
+        );
         let summary = self
             .data
             .map(|data| &data.summary)
@@ -325,27 +375,44 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
 }
 
 pub fn view(data: Option<&DashboardData>) -> Element<'_, Message> {
-    let avatar = svg(svg::Handle::from_memory(include_bytes!(
-        "../../assets/icons/profile-placeholder.svg"
-    )))
-    .width(80)
-    .height(80);
-    let home = tooltip(
-        button(iced::widget::Space::new().width(124).height(40))
+    responsive(move |size| {
+        let scale = Scale::new(size);
+        let content = scale.content();
+        let avatar_center = scale.point(Point::new(90., 125.));
+        let avatar = svg(svg::Handle::from_memory(include_bytes!(
+            "../../assets/icons/profile-placeholder.svg"
+        )))
+        .width(80. * content)
+        .height(80. * content);
+        let brand_origin = scale.point(Point::new(50., 30.));
+        let home = tooltip(
+            button(
+                iced::widget::Space::new()
+                    .width(124. * content)
+                    .height(40. * content),
+            )
             .padding(0)
             .on_press(Message::BackToTyping)
             .style(|_, _| button::Style::default()),
-        "New test (Tab)",
-        tooltip::Position::Bottom,
-    );
-    stack![
-        canvas(DashboardCanvas { data }).width(700).height(400),
-        chrome::brand(),
-        container(avatar).padding(iced::Padding::ZERO.left(50).top(85)),
-        container(home).padding(iced::Padding::ZERO.left(50).top(30)),
-    ]
-    .width(700)
-    .height(400)
+            "New test (Tab)",
+            tooltip::Position::Bottom,
+        );
+        stack![
+            canvas(DashboardCanvas { data })
+                .width(iced::Fill)
+                .height(iced::Fill),
+            chrome::scaled_brand(content, brand_origin),
+            container(avatar).padding(
+                iced::Padding::ZERO
+                    .left(avatar_center.x - 40. * content)
+                    .top(avatar_center.y - 40. * content)
+            ),
+            container(home).padding(iced::Padding::ZERO.left(brand_origin.x).top(brand_origin.y)),
+        ]
+        .width(iced::Fill)
+        .height(iced::Fill)
+        .into()
+    })
     .into()
 }
 

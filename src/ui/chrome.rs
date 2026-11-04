@@ -52,21 +52,25 @@ fn group(
 }
 
 pub fn brand() -> Element<'static, Message> {
+    scaled_brand(1., iced::Point::new(50., 30.))
+}
+
+pub fn scaled_brand(scale: f32, origin: iced::Point) -> Element<'static, Message> {
     let brand = row![
         container(icon(
             include_bytes!("../../assets/icons/keyboard.svg"),
-            37.0,
-            25.0
+            37.0 * scale,
+            25.0 * scale
         ))
-        .padding(iced::Padding::ZERO.top(7)),
+        .padding(iced::Padding::ZERO.top(7. * scale)),
         text("Typerr")
             .font(theme::BRAND_FONT)
-            .size(48)
+            .size(48. * scale)
             .line_height(1.0),
     ]
-    .spacing(8);
+    .spacing(8. * scale);
     container(brand)
-        .padding(iced::Padding::ZERO.top(30).left(50))
+        .padding(iced::Padding::ZERO.top(origin.y).left(origin.x))
         .into()
 }
 

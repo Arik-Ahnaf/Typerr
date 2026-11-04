@@ -434,9 +434,7 @@ impl App {
     pub fn view(&self) -> Element<'_, Message> {
         if self.page == Page::Dashboard {
             return crate::ui::page_host::PageHost::new(
-                container(crate::ui::dashboard::view(self.dashboard.as_ref()))
-                    .center_x(iced::Fill)
-                    .center_y(iced::Fill),
+                crate::ui::dashboard::view(self.dashboard.as_ref()),
                 self.dashboard_reply
                     .as_ref()
                     .map(|_| Instant::now() + Duration::from_millis(16)),
@@ -949,10 +947,9 @@ mod tests {
         ))
         .expect("software renderer");
         let mut app = App::default();
-        let click = |app: &mut App, x, y, button| {
+        let click_at_size = |app: &mut App, x, y, button, size| {
             let mut view = app.view();
             let mut tree = Tree::new(&view);
-            let size = iced::Size::new(700.0, 400.0);
             let node = view.as_widget_mut().layout(
                 &mut tree,
                 &renderer,
@@ -978,6 +975,9 @@ mod tests {
             for message in messages {
                 app.update(message);
             }
+        };
+        let click = |app: &mut App, x, y, button| {
+            click_at_size(app, x, y, button, iced::Size::new(700., 400.))
         };
         let initial_target = app.main.session.target().to_vec();
         click(&mut app, 615.0, 45.0, mouse::Button::Left);
@@ -1015,6 +1015,18 @@ mod tests {
         click(&mut app, 615.0, 45.0, mouse::Button::Left);
         assert_eq!(app.page, Page::Dashboard);
         assert_eq!(app.main.generation, generation);
+        for (size, point) in [
+            (iced::Size::new(1400., 800.), iced::Point::new(310., 110.)),
+            (iced::Size::new(1920., 1080.), iced::Point::new(440., 160.)),
+            (iced::Size::new(700., 900.), iced::Point::new(150., 95.)),
+        ] {
+            app.page = Page::Dashboard;
+            // Clicking the old unscaled location must not activate the moved logo.
+            click_at_size(&mut app, 55., 35., mouse::Button::Left, size);
+            assert_eq!(app.page, Page::Dashboard);
+            click_at_size(&mut app, point.x, point.y, mouse::Button::Left, size);
+            assert_eq!(app.page, Page::Typing);
+        }
     }
 
     #[test]
