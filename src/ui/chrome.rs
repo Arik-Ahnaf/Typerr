@@ -314,7 +314,7 @@ pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
         .style(|_, _| svg::Style {
             color: Some(theme::ORANGE)
         }),
-        label("V0.1").color(theme::alpha(theme::CORRECT, opacity))
+        label(concat!("V", env!("CARGO_PKG_VERSION"))).color(theme::alpha(theme::CORRECT, opacity))
     ]
     .spacing(5)
     .align_y(iced::Center);

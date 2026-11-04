@@ -37,6 +37,9 @@ cargo metadata --locked --offline --format-version 1 \
     --filter-platform x86_64-pc-windows-msvc > "$work/metadata.json"
 version=$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["package"]["version"])')
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+if [[ -n ${TYPERR_RELEASE_TAG:-} && $TYPERR_RELEASE_TAG != "v$version" ]]; then
+    echo "Release tag must be v$version to match Cargo.toml and package assets." >&2; exit 1
+fi
 name="typerr-${version}-windows-x86_64"
 payload="$work/$name"
 mkdir -p "$payload/notices/rust"

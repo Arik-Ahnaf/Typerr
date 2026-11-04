@@ -56,6 +56,7 @@ impl Mode {
 
 pub struct App {
     score_writer: Option<ScoreWriter>,
+    updater: typerr::update::Updater,
     dashboard: Option<typerr::storage::DashboardData>,
     dashboard_reply:
         Option<std::sync::mpsc::Receiver<typerr::storage::Result<typerr::storage::DashboardData>>>,
@@ -133,6 +134,8 @@ impl MainTyping {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    Upgrade,
+    DismissUpdate,
     Native(Event),
     Dashboard,
     BackToTyping,
@@ -151,6 +154,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             score_writer: None,
+            updater: typerr::update::Updater::default(),
             dashboard: None,
             dashboard_reply: None,
             main: MainTyping {
@@ -179,9 +183,13 @@ impl Default for App {
 }
 
 impl App {
-    pub fn new(settings: crate::settings::Settings) -> Self {
+    pub fn new(
+        settings: crate::settings::Settings,
+        startup: typerr::update::install::Startup,
+    ) -> Self {
         Self {
             score_writer: ScoreWriter::start_default(),
+            updater: typerr::update::Updater::start(startup),
             settings,
             ..Self::default()
         }
@@ -191,7 +199,30 @@ impl App {
         self.update_at(message, Instant::now());
     }
 
+    pub fn update_task(&mut self, message: Message) -> iced::Task<Message> {
+        let close = matches!(
+            message,
+            Message::Native(Event::Window(window::Event::CloseRequested))
+        );
+        self.update(message);
+        if self.updater.phase == typerr::update::Phase::Restarting
+            || (close && !self.updater.busy())
+        {
+            // Drain queued score writes before telling the helper it can replace files.
+            self.score_writer.take();
+            self.updater.shutdown();
+            return iced::exit();
+        }
+        iced::Task::none()
+    }
+
     fn advance(&mut self, now: Instant) {
+        let safe = matches!(self.page, Page::Score | Page::Dashboard)
+            || (self.page == Page::Typing && self.main.started.is_none());
+        self.updater.poll(safe);
+        if self.updater.visible {
+            self.main.amount_picker = None;
+        }
         if let Some(reply) = &self.dashboard_reply {
             match reply.try_recv() {
                 Ok(result) => {
@@ -241,6 +272,16 @@ impl App {
     }
 
     fn update_at(&mut self, message: Message, now: Instant) {
+        self.handle_at(message, now);
+        let safe = matches!(self.page, Page::Score | Page::Dashboard)
+            || (self.page == Page::Typing && self.main.started.is_none());
+        self.updater.poll(safe);
+        if self.updater.visible {
+            self.main.amount_picker = None;
+        }
+    }
+
+    fn handle_at(&mut self, message: Message, now: Instant) {
         let now = if let Message::Native(Event::Window(window::Event::RedrawRequested(timestamp))) =
             &message
         {
@@ -250,6 +291,51 @@ impl App {
         };
         // Enforce the time limit even if an input arrives before a delayed redraw.
         self.advance(now);
+        if matches!(
+            &message,
+            Message::Native(Event::Window(window::Event::RedrawRequested(_)))
+        ) {
+            self.updater.confirm_startup();
+        }
+        if self.updater.visible {
+            match message {
+                Message::Upgrade => self.updater.accept(),
+                Message::DismissUpdate => self.updater.dismiss(),
+                Message::Native(Event::Window(window::Event::Focused)) => self.focused = true,
+                Message::Native(Event::Window(window::Event::Unfocused)) => self.focused = false,
+                Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
+                    key,
+                    modifiers,
+                    repeat: false,
+                    ..
+                })) if self.focused
+                    && !modifiers.control()
+                    && !modifiers.alt()
+                    && !modifiers.logo() =>
+                {
+                    match key {
+                        keyboard::Key::Named(keyboard::key::Named::Escape) => {
+                            self.updater.dismiss()
+                        }
+                        keyboard::Key::Named(keyboard::key::Named::Tab) => {
+                            self.updater.focus_primary = !self.updater.focus_primary
+                        }
+                        keyboard::Key::Named(
+                            keyboard::key::Named::Enter | keyboard::key::Named::Space,
+                        ) => {
+                            if self.updater.focus_primary {
+                                self.updater.accept();
+                            } else {
+                                self.updater.dismiss();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+            return;
+        }
         match message {
             Message::Dashboard if matches!(self.page, Page::Typing | Page::Score) => {
                 self.main.amount_picker = None;
@@ -431,22 +517,16 @@ impl App {
         .into()
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    fn page_content(&self) -> Element<'_, Message> {
         if self.page == Page::Dashboard {
-            return crate::ui::page_host::PageHost::new(
-                crate::ui::dashboard::view(self.dashboard.as_ref()),
-                self.dashboard_reply
-                    .as_ref()
-                    .map(|_| Instant::now() + Duration::from_millis(16)),
-                false,
-            )
-            .into();
+            return crate::ui::dashboard::view(self.dashboard.as_ref());
         }
         let opacity = self.page.score_opacity();
+        let enabled = !self.updater.visible;
         let typing: Element<'_, Message> = if self.page == Page::Score {
             Space::new().width(iced::Fill).height(iced::Fill).into()
         } else {
-            self.typing_view(1.0 - opacity, self.page == Page::Typing)
+            self.typing_view(1.0 - opacity, self.page == Page::Typing && enabled)
         };
         let score: Element<'_, Message> = if self.page == Page::Typing {
             Space::new().into()
@@ -454,24 +534,43 @@ impl App {
             container(crate::ui::score::view(
                 &self.main.score,
                 opacity,
-                self.page == Page::Score,
+                self.page == Page::Score && enabled,
             ))
             .center_x(iced::Fill)
             .center_y(iced::Fill)
             .into()
         };
-        crate::ui::page_host::PageHost::new(
+        stack![
+            typing,
+            score,
+            crate::ui::chrome::brand(),
+            crate::ui::chrome::user_name(enabled && !matches!(self.page, Page::Transition { .. }))
+        ]
+        .into()
+    }
+
+    pub fn view(&self) -> Element<'_, Message> {
+        let page = self.page_content();
+        let content = if self.updater.visible {
             stack![
-                typing,
-                score,
-                crate::ui::chrome::brand(),
-                crate::ui::chrome::user_name(!matches!(self.page, Page::Transition { .. }))
-            ],
-            if self.page == Page::Typing {
-                self.main.next_tick()
-            } else {
-                None
-            },
+                page,
+                iced::widget::opaque(crate::ui::update_prompt::view(&self.updater))
+            ]
+            .into()
+        } else {
+            page
+        };
+        let poll = (self.updater.pending() || self.dashboard_reply.is_some())
+            .then(|| Instant::now() + Duration::from_millis(50));
+        let timer = if self.page == Page::Typing {
+            self.main.next_tick()
+        } else {
+            None
+        };
+        let next = poll.into_iter().chain(timer).min();
+        crate::ui::page_host::PageHost::new(
+            content,
+            next,
             matches!(self.page, Page::Transition { .. }),
         )
         .into()
@@ -520,6 +619,7 @@ mod tests {
     fn app(target: &str) -> App {
         App {
             score_writer: None,
+            updater: typerr::update::Updater::default(),
             dashboard: None,
             dashboard_reply: None,
             main: MainTyping {
@@ -540,6 +640,99 @@ mod tests {
             page: Page::Typing,
             focused: true,
             settings: crate::settings::Settings::default(),
+        }
+    }
+
+    #[test]
+    fn update_prompt_waits_for_completion_and_isolates_input() {
+        use typerr::update::Phase;
+        let mut app = app("ab");
+        let start = Instant::now();
+        app.update_at(
+            key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+            start,
+        );
+        app.updater.phase = Phase::Available;
+        app.update_at(
+            key(Key::Character("b".into()), Some("b"), Modifiers::empty()),
+            start + Duration::from_secs(1),
+        );
+        assert!(!app.updater.visible);
+        app.update_at(
+            Message::Native(Event::Window(window::Event::RedrawRequested(
+                start + Duration::from_secs(2),
+            ))),
+            start + Duration::from_secs(2),
+        );
+        assert_eq!(app.page, Page::Score);
+        assert!(app.updater.visible);
+        let generation = app.main.generation;
+        app.update_at(Message::Next, start + Duration::from_secs(2));
+        app.update_at(Message::Dashboard, start + Duration::from_secs(2));
+        app.update_at(
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            start + Duration::from_secs(2),
+        );
+        assert_eq!(app.page, Page::Score);
+        assert_eq!(app.main.generation, generation);
+        assert!(app.updater.focus_primary);
+        app.update_at(
+            key(Key::Named(Named::Escape), None, Modifiers::empty()),
+            start + Duration::from_secs(2),
+        );
+        assert!(!app.updater.visible);
+        app.update_at(Message::Next, start + Duration::from_secs(2));
+        assert_eq!(app.page, Page::Typing);
+    }
+
+    #[test]
+    fn startup_prompt_and_cancel_preserve_session_and_timer() {
+        use typerr::update::Phase;
+        let mut app = app("ab cd");
+        let now = Instant::now();
+        app.main.mode = Mode::Time;
+        app.updater.phase = Phase::Available;
+        app.update_at(
+            key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+            now,
+        );
+        assert_eq!(app.main.session.position(), 0);
+        assert!(app.main.started.is_none());
+        assert!(app.main.deadline.is_none());
+        app.update_at(
+            key(Key::Named(Named::Backspace), None, Modifiers::empty()),
+            now,
+        );
+        app.update_at(Message::SelectMode(Mode::Words), now);
+        assert_eq!(app.main.mode, Mode::Time);
+        assert_eq!(app.main.revision, 0);
+        app.update_at(Message::DismissUpdate, now);
+        app.update_at(
+            key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+            now,
+        );
+        assert_eq!(app.main.session.position(), 1);
+        assert_eq!(app.main.deadline, Some(now + Duration::from_secs(30)));
+    }
+
+    #[test]
+    fn deferred_prompt_opens_on_dashboard_or_fresh_tab() {
+        use typerr::update::Phase;
+        for dashboard in [true, false] {
+            let mut app = app("abc");
+            let now = Instant::now();
+            app.update_at(
+                key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+                now,
+            );
+            app.updater.phase = Phase::Available;
+            let message = if dashboard {
+                Message::Dashboard
+            } else {
+                key(Key::Named(Named::Tab), None, Modifiers::empty())
+            };
+            app.update_at(message, now);
+            assert!(app.updater.visible);
         }
     }
 
@@ -979,6 +1172,14 @@ mod tests {
         let click = |app: &mut App, x, y, button| {
             click_at_size(app, x, y, button, iced::Size::new(700., 400.))
         };
+        app.updater.phase = typerr::update::Phase::Available;
+        app.updater.visible = true;
+        click(&mut app, 615., 45., mouse::Button::Left);
+        assert_eq!(app.page, Page::Typing);
+        click(&mut app, 377., 45., mouse::Button::Right);
+        assert_eq!(app.main.amount_picker, None);
+        click(&mut app, 365., 250., mouse::Button::Left);
+        assert!(!app.updater.visible, "Later dismisses the native modal");
         let initial_target = app.main.session.target().to_vec();
         click(&mut app, 615.0, 45.0, mouse::Button::Left);
         assert_eq!(app.page, Page::Dashboard);

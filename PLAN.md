@@ -1,8 +1,8 @@
-# Alpha 0.1 implementation plan
+# Typerr implementation plan
 
 ## Version and scope
 
-Current target: **Alpha 0.1**, crate version `0.1.0`.
+Current target: **Startup updater**, crate version `1.1.0`. Earlier alpha milestones below are historical.
 
 Deliver native Rust/Iced Main Typing and Score pages with 500-word buffers, responsive input/layout, smooth 100 ms caret movement, and a 300 ms completion crossfade. The Score page uses measured WPM, accuracy, raw WPM, consistency, elapsed time, and a native Canvas graph; see the 2026-10-28 scoring follow-up.
 
@@ -612,3 +612,63 @@ logo and right-anchored greeting crops are pixel-identical between 875 × 500 an
 harness are under `target/dashboard-fixed-header-verification/`; only temporary
 fixture databases were used. Physical input, native Wayland, and native Windows
 remain unverified. No push or package rebuild was performed.
+
+## Startup updates — 2026-11-04
+
+Implemented the approved native startup updater. Cargo, footer/title, portable
+asset names, and generated Windows version resources now agree on 1.1.0. Stable
+GitHub checks run once at startup on a worker, with a ten-second network deadline;
+legacy v1.0.0 / 0.1.0 assets cannot be offered. Available updates wait until a safe
+pause in typing. The native modal supports Later, Upgrade and restart, progress,
+Cancel before installation, Retry/Close, and keyboard navigation without leaking
+keys or pointer actions into the typing session. PageHost still forwards native
+input synchronously exactly once; updater polling stops when no reply is pending.
+
+The worker validates exact asset names, mandatory SHA256SUMS and optional GitHub
+digests, HTTPS redirect hosts, bounded downloads/extraction, archive paths/types,
+executable architecture, and embedded version. Portable installs stage on the
+same filesystem and use durable file backups, atomic regular-file replacement,
+a recovery journal, OS locks, and a copied helper. The GUI drains score writes
+before releasing the helper; the new app confirms its first redraw before backup
+cleanup. Existing settings/history and unrelated files are retained. Pacman-owned
+copies use package metadata validation and pkexec/pacman without modifying
+signature policy. Only pacman is elevated. Settings/profile/database migrations,
+publication, and background update services remain out of scope.
+
+Validation evidence under `target/update-verification/` and build logs:
+
+- Formatting, strict locked all-target Clippy, and all 99 tests pass (39 library,
+  48 application/widget, 10 storage, 2 layout). Added release/version/checksum,
+  malformed/unsafe archive, cancellation, lock, transaction recovery, package
+  metadata/authentication, and modal deferral/input coverage. Native widget
+  pointer events also verify the modal blocks underlying account/mode controls
+  and that its Later button dismisses it.
+- Locked native debug/release builds and both packaging scripts pass. The Arch
+  archive/package and Windows x64 ZIP include current dependency notices; the
+  collector found the new crates' upstream notices without supplemental files.
+  Windows MSVC all-target release Clippy, static-runtime PE inspection, version
+  resource generation, and cross-build pass.
+- Inspected native XWayland renderer captures for available/download/verification/
+  installation/error states at 700 × 400 and the offer at 1000 × 650. The harness
+  uses the production modal/app view and fixture state, not personal history.
+- Exercised the actual helper in disposable application folders: successful native
+  restart/confirmation, failed-new-process rollback, and interrupted replacement
+  recovery. Verified the running binary version, preserved edited settings and an
+  unrelated file, and cleaned staging. No real installation was changed.
+- Performed a real pacman upgrade from 0.1.0 to 1.1.0 in a disposable user-namespace
+  root using a copied package database as a dependency fixture. Package checks and
+  transactions passed, edited settings survived, and the installed binary reports
+  1.1.0. This tests pacman behavior, not a desktop polkit authentication prompt.
+- The implemented Rust HTTPS client successfully followed the public GitHub asset
+  redirect and downloaded/verified the release checksum file. The live API returned
+  HTTP 403 with its shared unauthenticated quota exhausted (remaining=0); check
+  failures remain quiet by design. Version selection is covered by fixtures, and
+  the current public v1.0.0 metadata was inspected before implementation.
+
+Remaining limitations: native Windows replacement/restart and native Wayland were
+not available for runtime validation. Desktop polkit interaction and physical
+keyboard/mouse input remain manual checks; screenshots and injected widget events
+are not physical-input evidence. The first updater-enabled build must be installed
+manually. Unsigned packages still obey each machine's pacman policy. No commit,
+push, tag, or release publication was performed. See UPDATING.md for recovery and
+release-contract requirements; preserve these platform qualifications in delivery.

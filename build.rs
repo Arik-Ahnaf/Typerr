@@ -47,12 +47,47 @@ fn main() {
     println!("cargo:rerun-if-changed=packaging/windows/typerr.rc");
     println!("cargo:rerun-if-env-changed=LLVM_RC");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        let version = env::var("CARGO_PKG_VERSION").expect("package version");
+        let parts: Vec<_> = version.split('.').collect();
+        assert_eq!(parts.len(), 3, "release version must be major.minor.patch");
+        let numeric = format!("{},{},{},0", parts[0], parts[1], parts[2]);
+        let icon = std::path::Path::new("assets/icons/typerr-logo.ico")
+            .canonicalize()
+            .expect("icon path");
+        let source = format!(
+            r#"1 ICON "{}"
+1 VERSIONINFO
+FILEVERSION {numeric}
+PRODUCTVERSION {numeric}
+FILEOS 0x40004L
+FILETYPE 0x1L
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904b0"
+  BEGIN
+   VALUE "FileDescription", "Typerr"
+   VALUE "FileVersion", "{version}"
+   VALUE "ProductVersion", "{version}"
+   VALUE "ProductName", "Typerr"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x0409, 1200
+ END
+END
+"#,
+            icon.display().to_string().replace('\\', "/")
+        );
+        let rc = output.join("typerr.rc");
+        fs::write(&rc, source).expect("write version resource");
         let resource = output.join("typerr.res");
         let compiler = env::var_os("LLVM_RC").unwrap_or_else(|| "llvm-rc".into());
         let status = std::process::Command::new(compiler)
             .arg("/FO")
             .arg(&resource)
-            .arg("packaging/windows/typerr.rc")
+            .arg(&rc)
             .status()
             .expect("run llvm-rc to embed the Windows icon (see BUILD.md)");
         assert!(status.success(), "compile Windows icon resource");

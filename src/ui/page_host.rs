@@ -32,7 +32,9 @@ impl<'a> PageHost<'a> {
                 shell.publish(Message::Native(event.clone()));
                 shell.capture_event();
             }
-            Event::Window(window::Event::Focused | window::Event::Unfocused) => {
+            Event::Window(
+                window::Event::Focused | window::Event::Unfocused | window::Event::CloseRequested,
+            ) => {
                 shell.publish(Message::Native(event.clone()));
             }
             Event::Window(window::Event::RedrawRequested(now)) => {

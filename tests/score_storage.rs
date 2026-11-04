@@ -368,7 +368,7 @@ fn dashboard_snapshot_bins_fractional_boundaries_and_extreme_speeds() {
     let data = store.dashboard().unwrap();
     assert_eq!(data.bin_width, 10.);
     assert_eq!(data.bins, [2, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1]);
-    assert_eq!(data.summary.completed_tests, data.bins.iter().sum());
+    assert_eq!(data.summary.completed_tests, data.bins.iter().sum::<u64>());
     assert_eq!(data.personal_bests[0].test.wpm, 119.999);
     store
         .insert(&CompletedTest {

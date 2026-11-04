@@ -36,3 +36,26 @@ theme colors are embedded; no source checkout or network is needed for typing.
 
 Third-party notices are in `notices/` in the portable archive, or
 `/usr/share/licenses/typerr/` after installation.
+
+## Updates
+
+At startup, Typerr checks the public GitHub repository for a newer stable release.
+The app remains usable offline. An offer waits until your current test finishes
+or you return to a fresh session/Dashboard. Choose **Upgrade and restart** to
+install, or **Later** to keep this version until the next launch. Tab selects a
+dialog button, Enter activates it, and Escape dismisses/cancels when available.
+Downloads can be cancelled before installation starts. Close other Typerr windows
+before upgrading. Settings and score history are preserved.
+
+Portable updates need write access to the application folder. Downloads are
+verified before files change, and backups remain until the new app starts.
+If an update is interrupted, start Typerr again to recover. Do not remove the
+`.typerr-update` folder while an update or recovery is running. Updater errors
+are logged to `updates-errors.log` beside the score database. The first version
+with this feature (1.1.0) must be installed manually.
+
+Pacman installations request administrator authentication through polkit and
+install the downloaded package using pacman. A graphical polkit authentication
+agent and `polkit` are needed for this flow. If authentication is unavailable or
+denied, the dialog gives the saved package path for manual `sudo pacman -U`
+installation. Pacman retains its configured signature/dependency checks.

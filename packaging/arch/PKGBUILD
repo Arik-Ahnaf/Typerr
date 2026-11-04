@@ -10,7 +10,8 @@ license=('LicenseRef-Typerr-Unspecified')
 depends=('glibc' 'gcc-libs' 'libx11' 'libxcursor' 'libxi' 'libxrandr'
          'libxkbcommon' 'libxkbcommon-x11' 'wayland' 'libglvnd'
          'vulkan-icd-loader' 'libxcb')
-optdepends=('xdg-utils: open footer links in the default browser'
+optdepends=('polkit: authenticate in-app package upgrades (graphical authentication agent required)'
+            'xdg-utils: open footer links in the default browser'
             'vulkan-driver: hardware Vulkan rendering')
 backup=('usr/lib/typerr/settings.json')
 options=('!strip' '!debug')

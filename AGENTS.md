@@ -4,7 +4,7 @@
 
 Typerr is a native Rust typing application inspired by Monkeytype. Responsive input, accurate text layout, and smooth caret movement take priority over feature count. Target platforms are Windows and Arch Linux. Develop through small, independently testable alpha versions.
 
-The current score-page follow-up (`0.1.0`) contains Main Typing, Score, and Dashboard pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the foreground color; inactive icons use Comment. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; completed-test SQLite history and Dashboard read queries are authorized by the 2026-11-03 follow-up. The 2026-11-04 follow-up authorizes the native Dashboard with hardcoded profile data; profile storage, Settings, writing settings, and application networking remain excluded. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
+The current updater follow-up (`1.1.0`) contains Main Typing, Score, and Dashboard pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the foreground color; inactive icons use Comment. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; completed-test SQLite history and Dashboard read queries are authorized by the 2026-11-03 follow-up. The 2026-11-04 follow-up authorizes the native Dashboard with hardcoded profile data; profile storage, Settings, and editing existing settings remain excluded. The startup updater follow-up authorizes GitHub release checks, accepted downloads/installations, and temporary updater state. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
 
 The UI must remain native. Do not add HTML, CSS, JavaScript, webviews, or embedded browsers.
 
@@ -137,7 +137,7 @@ failures to stderr and the writable local log while preserving typing behavior.
 Dashboard averages are per completed test, duration sums only completed tests,
 and personal bests combine all options within each mode/amount; accuracy comes
 from the winning WPM row. Keep tests isolated from actual user history. SQLite is
-bundled through `rusqlite`; `tempfile` is test-only. Preserve dependency notices
+bundled through `rusqlite`; `tempfile` is also used for private updater staging. Preserve dependency notices
 and Windows cross-build checks when changing storage dependencies.
 
 
@@ -172,3 +172,29 @@ preserving real zero values. Best accuracy belongs to its winning WPM row.
 The histogram counts all completed tests in twelve ranges, initially 0–9 through
 110–119, widening in multiples of ten to include higher speeds. No history rows
 or profile values are fabricated. No new dependency or schema migration.
+
+## Startup updater — 2026-11-04
+
+Read `UPDATING.md` before changing update behavior. Version 1.1.0 aligns Cargo,
+visible version labels, package filenames, and future `v<version>` GitHub tags;
+the historical v1.0.0 release contains 0.1.0 packages and must never be offered
+as an upgrade. Networking is limited to a once-per-launch stable GitHub release
+check and downloads explicitly accepted through the native dialog. Check errors
+are quiet; defer offers until Typing has not started, Score, or Dashboard.
+
+`src/update.rs` owns worker communication; `src/update/` owns bounded HTTPS,
+release validation, extraction, and installation/recovery. No updater work in
+engine, layout, statistics, or SQLite. `App::default` remains side-effect-free.
+Keep synchronous PageHost input forwarding. Modal keys must never edit/restart
+underlying sessions. Poll only while worker results or startup confirmation are
+pending. Wait for GUI acknowledgment before entering non-cancellable installation.
+Drain score writes before releasing the helper handoff.
+
+Require the exact platform/version archive, SHA256SUMS, and any GitHub asset
+digest; reject unsafe archive paths, links, duplicate entries, wrong architecture,
+and mismatched embedded versions. Portable replacement uses a durable journal,
+backups, process locks, and a copied helper. Preserve existing settings and user
+history. Package-owned installations must use authenticated pacman, never direct
+file replacement or weakened signature policy. Temporary downloads, lock files,
+recovery journals, and updater diagnostics are authorized; no settings UI,
+automatic publication, or application data migration is authorized.

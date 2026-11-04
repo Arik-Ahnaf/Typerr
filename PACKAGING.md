@@ -22,8 +22,8 @@ from Cargo config before running it.
 
 Outputs for the current `Cargo.toml` version:
 
-- `dist/typerr-0.1.0-arch-linux-x86_64.tar.gz`
-- `dist/typerr-0.1.0-1-x86_64.pkg.tar.zst`
+- `dist/typerr-1.1.0-arch-linux-x86_64.tar.gz`
+- `dist/typerr-1.1.0-1-x86_64.pkg.tar.zst`
 - `dist/SHA256SUMS`
 
 Check downloaded/copied artifacts with:
@@ -44,14 +44,14 @@ replaces matching distribution filenames only after both formats build.
 Portable archive:
 
 ```sh
-tar -xzf dist/typerr-0.1.0-arch-linux-x86_64.tar.gz
-./typerr-0.1.0-arch-linux-x86_64/typerr
+tar -xzf dist/typerr-1.1.0-arch-linux-x86_64.tar.gz
+./typerr-1.1.0-arch-linux-x86_64/typerr
 ```
 
 Pacman package (optional; packaging does not run this):
 
 ```sh
-sudo pacman -U dist/typerr-0.1.0-1-x86_64.pkg.tar.zst
+sudo pacman -U dist/typerr-1.1.0-1-x86_64.pkg.tar.zst
 typerr
 ```
 
@@ -106,7 +106,7 @@ bash packaging/build-windows.sh
 ```
 
 This cross-compiles the MSVC release, checks the x64 PE GUI subsystem and
-runtime imports, and creates `dist/typerr-0.1.0-windows-x86_64.zip`.
+runtime imports, and creates `dist/typerr-1.1.0-windows-x86_64.zip`.
 Extract the whole ZIP on Windows and open `typerr.exe`. The ZIP contains the
 current settings (24px), usage instructions, and Windows dependency/font/Rust
 notices. The executable includes the supplied logo at multiple icon sizes for
@@ -119,3 +119,20 @@ Both packaging scripts retain checksums for existing Arch and Windows archives
 in `dist/SHA256SUMS`. No GitHub Actions, host installation, or upload is involved.
 Cross-compilation and ZIP checks are separate from native Windows GUI testing;
 the latter remains required before claiming runtime support.
+
+## Updater release contract
+
+Build/package version 1.1.0 and later with the matching `v<version>` GitHub tag.
+Set `TYPERR_RELEASE_TAG=v1.1.0` while packaging to enforce the intended tag.
+Native packaging executes `typerr --version`; Windows PE version resources are
+generated from Cargo's package version. Never reuse the historical v1.0.0 /
+0.1.0 mismatch. Keep all platform assets and `SHA256SUMS` attached to the same
+stable release, with exactly the generated names. Upload all assets before
+making a release latest. The updater rejects incomplete releases.
+
+See [UPDATING.md](UPDATING.md) for installation, integrity checks, and recovery.
+Polkit plus a desktop authentication agent are optional runtime requirements
+for in-app pacman upgrades. Portable replacement requires a writable application
+folder. New HTTPS/archive/checksum dependency notices are collected by the
+existing locked-graph notice collector. No updater service or startup task is
+installed; update checks run only when the user launches Typerr.

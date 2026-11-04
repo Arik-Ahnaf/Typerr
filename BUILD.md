@@ -77,7 +77,7 @@ This checkout also has project-local tools under `target/windows-tools/`, which
 the script detects automatically; setup is unnecessary while those remain available.
 
 Outputs: `target/x86_64-pc-windows-msvc/release/typerr.exe` and
-`dist/typerr-0.1.0-windows-x86_64.zip`, plus updated `dist/SHA256SUMS`.
+`dist/typerr-1.1.0-windows-x86_64.zip`, plus updated `dist/SHA256SUMS`.
 The static-runtime flags apply only to the Windows target. No Wine or GitHub
 Actions is needed to build. Test the extracted application on Windows before
 claiming native Windows runtime support.
@@ -102,3 +102,11 @@ LLVM on `PATH`, or its path in `LLVM_RC`, to embed the executable icon.
 
 Unit tests and builds do not verify native GUI behavior. Verify each display
 backend separately; cross-compilation does not verify native Windows behavior.
+
+## Updater checks
+
+`./target/debug/typerr --version` prints the Cargo version and exits without
+opening a window, database, or network connection. Updater unit tests use
+fixtures and temporary directories. Native UI checks should use isolated
+XDG_DATA_HOME/LOCALAPPDATA values to avoid real score history. See
+[UPDATING.md](UPDATING.md) before testing file replacement or package upgrades.

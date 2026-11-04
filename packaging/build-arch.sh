@@ -28,10 +28,14 @@ cargo metadata --locked --offline --format-version 1 \
     --filter-platform x86_64-unknown-linux-gnu > "$work/metadata.json"
 version=$(python3 -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("Cargo.toml").read_text())["package"]["version"])')
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo 'Unsupported package version' >&2; exit 1; }
+if [[ -n ${TYPERR_RELEASE_TAG:-} && $TYPERR_RELEASE_TAG != "v$version" ]]; then
+    echo "Release tag must be v$version to match Cargo.toml and package assets." >&2; exit 1
+fi
 name="typerr-${version}-arch-linux-x86_64"
 payload="$work/$name"
 mkdir -p "$payload/notices"
 binary="$root/target/release/typerr"
+[[ $("$binary" --version) == "Typerr $version" ]] || { echo "Executable version mismatch" >&2; exit 1; }
 file "$binary" | tee "$work/binary.txt"
 file "$binary" | grep -q 'ELF 64-bit.*x86-64'
 ldd "$binary" | tee "$work/linkage.txt"

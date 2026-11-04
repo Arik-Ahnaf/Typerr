@@ -28,3 +28,20 @@ graphics drivers are still required. Native Windows GUI behavior has not yet
 been verified; cross-compilation and archive checks do not establish that.
 
 Third-party licenses and notices are in `notices/`.
+
+## Updates
+
+At startup, Typerr checks the public GitHub repository for a newer stable release.
+The app remains usable offline. An offer waits until your current test finishes
+or you return to a fresh session/Dashboard. Choose **Upgrade and restart** to
+install, or **Later** to keep this version until the next launch. Tab selects a
+dialog button, Enter activates it, and Escape dismisses/cancels when available.
+Downloads can be cancelled before installation starts. Close other Typerr windows
+before upgrading. Settings and score history are preserved.
+
+Portable updates need write access to the application folder. Downloads are
+verified before files change, and backups remain until the new app starts.
+If an update is interrupted, start Typerr again to recover. Do not remove the
+`.typerr-update` folder while an update or recovery is running. Updater errors
+are logged to `updates-errors.log` beside the score database. The first version
+with this feature (1.1.0) must be installed manually.
