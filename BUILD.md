@@ -110,3 +110,28 @@ opening a window, database, or network connection. Updater unit tests use
 fixtures and temporary directories. Native UI checks should use isolated
 XDG_DATA_HOME/LOCALAPPDATA values to avoid real score history. See
 [UPDATING.md](UPDATING.md) before testing file replacement or package upgrades.
+
+On first launch, enter a name (1–16 characters) and choose Save or press Enter.
+The name is saved as `name` in `settings.json` and used on the account button
+and Dashboard. The prompt blocks the app until saving succeeds. Existing valid
+names skip the prompt on subsequent launches.
+
+User settings take precedence over the working-directory and executable-adjacent
+files described above. When the original file cannot be written, Typerr preserves
+its other values in a user-owned `settings.json`: `$XDG_CONFIG_HOME/typerr/`
+(or `~/.config/typerr/`) on Linux, `%LOCALAPPDATA%/typerr/` on Windows. No administrator
+access is needed to save a name for a packaged installation. Invalid JSON is
+reported without overwriting it. Packages strip the builder's saved name.
+
+On Dashboard, hover over your profile picture to see the pencil, then click to
+choose a PNG or JPG. Drag the image to position it and use the slider or mouse
+wheel to zoom. Save applies the crop; Discard, ×, or Escape keeps your previous
+picture. Tab selects zoom/Discard/Save; arrows adjust zoom, Shift+arrows moves the
+image, and Enter activates a selected button. The saved picture is a separate
+512px `avatar.png` in the user configuration folder and survives moving/deleting
+the source image. Failed reads/saves show an error without changing your picture.
+
+PNG/JPG decoding uses the locked `image` codecs; `rfd` uses the Windows native
+file dialog or Linux desktop portal (with Zenity fallback). On Arch, enable your
+desktop's `xdg-desktop-portal` backend, or install `zenity` for the fallback.
+Avatar persistence uses the user settings directory described above.

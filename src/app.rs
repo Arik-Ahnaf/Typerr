@@ -55,6 +55,10 @@ impl Mode {
 }
 
 pub struct App {
+    profile: Option<crate::settings::Profile>,
+    picture: crate::profile_picture::Picture,
+    name_draft: String,
+    name_error: Option<String>,
     score_writer: Option<ScoreWriter>,
     updater: typerr::update::Updater,
     dashboard: Option<typerr::storage::DashboardData>,
@@ -134,6 +138,14 @@ impl MainTyping {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    ChoosePicture,
+    ZoomPicture(f32),
+    PanPicture(iced::Vector),
+    SavePicture,
+    DiscardPicture,
+    NameChanged(String),
+    SaveName,
+    FocusName,
     Upgrade,
     DismissUpdate,
     Native(Event),
@@ -153,6 +165,10 @@ pub enum Message {
 impl Default for App {
     fn default() -> Self {
         Self {
+            profile: None,
+            picture: crate::profile_picture::Picture::default(),
+            name_draft: String::new(),
+            name_error: None,
             score_writer: None,
             updater: typerr::update::Updater::default(),
             dashboard: None,
@@ -188,6 +204,10 @@ impl App {
         startup: typerr::update::install::Startup,
     ) -> Self {
         Self {
+            profile: Some(crate::settings::Profile::load()),
+            picture: crate::profile_picture::Picture::load(
+                crate::settings::user_settings_path().map(|p| p.with_file_name("avatar.png")),
+            ),
             score_writer: ScoreWriter::start_default(),
             updater: typerr::update::Updater::start(startup),
             settings,
@@ -200,13 +220,16 @@ impl App {
     }
 
     pub fn update_task(&mut self, message: Message) -> iced::Task<Message> {
+        if self.needs_name() && matches!(message, Message::FocusName) {
+            return iced::widget::operation::focus("name-input");
+        }
         let close = matches!(
             message,
             Message::Native(Event::Window(window::Event::CloseRequested))
         );
         self.update(message);
         if self.updater.phase == typerr::update::Phase::Restarting
-            || (close && !self.updater.busy())
+            || (close && !self.updater.busy() && !self.picture.saving())
         {
             // Drain queued score writes before telling the helper it can replace files.
             self.score_writer.take();
@@ -217,9 +240,11 @@ impl App {
     }
 
     fn advance(&mut self, now: Instant) {
+        self.picture.poll();
         let safe = matches!(self.page, Page::Score | Page::Dashboard)
             || (self.page == Page::Typing && self.main.started.is_none());
-        self.updater.poll(safe);
+        self.updater
+            .poll(safe && !self.needs_name() && !self.picture.modal());
         if self.updater.visible {
             self.main.amount_picker = None;
         }
@@ -275,7 +300,8 @@ impl App {
         self.handle_at(message, now);
         let safe = matches!(self.page, Page::Score | Page::Dashboard)
             || (self.page == Page::Typing && self.main.started.is_none());
-        self.updater.poll(safe);
+        self.updater
+            .poll(safe && !self.needs_name() && !self.picture.modal());
         if self.updater.visible {
             self.main.amount_picker = None;
         }
@@ -296,6 +322,107 @@ impl App {
             Message::Native(Event::Window(window::Event::RedrawRequested(_)))
         ) {
             self.updater.confirm_startup();
+        }
+        if self.needs_name() {
+            match message {
+                Message::NameChanged(value) => {
+                    self.name_draft = value.chars().filter(|c| !c.is_control()).take(16).collect();
+                    self.name_error = None;
+                }
+                Message::SaveName => {
+                    if let Some(profile) = &mut self.profile {
+                        match profile.save(&self.name_draft) {
+                            Ok(()) => self.name_error = None,
+                            Err(error) => self.name_error = Some(error),
+                        }
+                    }
+                }
+                Message::Native(Event::Window(window::Event::Focused)) => self.focused = true,
+                Message::Native(Event::Window(window::Event::Unfocused)) => self.focused = false,
+                _ => {}
+            }
+            return;
+        }
+        if self.picture.modal() {
+            match message {
+                Message::ZoomPicture(zoom) if !self.picture.busy() => {
+                    if let Some(crop) = &mut self.picture.crop {
+                        crop.set_zoom(zoom);
+                    }
+                }
+                Message::PanPicture(offset) if !self.picture.busy() => {
+                    if let Some(crop) = &mut self.picture.crop {
+                        crop.pan(offset);
+                    }
+                }
+                Message::SavePicture => self.picture.save(),
+                Message::DiscardPicture => self.picture.discard(),
+                Message::Native(Event::Window(window::Event::Focused)) => self.focused = true,
+                Message::Native(Event::Window(window::Event::Unfocused)) => self.focused = false,
+                Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
+                    key,
+                    modifiers,
+                    repeat,
+                    ..
+                })) if self.focused
+                    && !self.picture.busy()
+                    && !modifiers.control()
+                    && !modifiers.alt()
+                    && !modifiers.logo() =>
+                {
+                    use keyboard::{Key, key::Named};
+                    match key {
+                        Key::Named(Named::Escape) if !repeat => self.picture.discard(),
+                        Key::Named(Named::Tab) if !repeat => {
+                            self.picture.focus = if self.picture.focus >= 3 {
+                                if modifiers.shift() { 2 } else { 0 }
+                            } else {
+                                (self.picture.focus + if modifiers.shift() { 2 } else { 1 }) % 3
+                            }
+                        }
+                        Key::Named(Named::Enter | Named::Space) if !repeat => {
+                            if self.picture.focus == 1 {
+                                self.picture.discard();
+                            } else if self.picture.focus == 2 {
+                                self.picture.save();
+                            }
+                        }
+                        Key::Named(
+                            direction @ (Named::ArrowLeft
+                            | Named::ArrowRight
+                            | Named::ArrowUp
+                            | Named::ArrowDown),
+                        ) => {
+                            if let Some(crop) = &mut self.picture.crop {
+                                if self.picture.focus == 0 && !modifiers.shift() {
+                                    crop.set_zoom(
+                                        crop.zoom
+                                            + if matches!(
+                                                direction,
+                                                Named::ArrowRight | Named::ArrowUp
+                                            ) {
+                                                0.05
+                                            } else {
+                                                -0.05
+                                            },
+                                    );
+                                } else if modifiers.shift() {
+                                    let delta = match direction {
+                                        Named::ArrowLeft => iced::Vector::new(-2., 0.),
+                                        Named::ArrowRight => iced::Vector::new(2., 0.),
+                                        Named::ArrowUp => iced::Vector::new(0., -2.),
+                                        _ => iced::Vector::new(0., 2.),
+                                    };
+                                    crop.pan(crop.offset + delta);
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+            return;
         }
         if self.updater.visible {
             match message {
@@ -337,6 +464,7 @@ impl App {
             return;
         }
         match message {
+            Message::ChoosePicture if self.page == Page::Dashboard => self.picture.choose(),
             Message::Dashboard if matches!(self.page, Page::Typing | Page::Score) => {
                 self.main.amount_picker = None;
                 self.dashboard = None;
@@ -519,10 +647,14 @@ impl App {
 
     fn page_content(&self) -> Element<'_, Message> {
         if self.page == Page::Dashboard {
-            return crate::ui::dashboard::view(self.dashboard.as_ref());
+            return crate::ui::dashboard::view(
+                self.dashboard.as_ref(),
+                self.user_name(),
+                &self.picture.avatar,
+            );
         }
         let opacity = self.page.score_opacity();
-        let enabled = !self.updater.visible;
+        let enabled = !self.updater.visible && !self.needs_name();
         let typing: Element<'_, Message> = if self.page == Page::Score {
             Space::new().width(iced::Fill).height(iced::Fill).into()
         } else {
@@ -544,14 +676,43 @@ impl App {
             typing,
             score,
             crate::ui::chrome::brand(),
-            crate::ui::chrome::user_name(enabled && !matches!(self.page, Page::Transition { .. }))
+            crate::ui::chrome::user_name(
+                self.user_name(),
+                enabled && !matches!(self.page, Page::Transition { .. })
+            )
         ]
         .into()
     }
 
+    pub fn needs_name(&self) -> bool {
+        self.profile.as_ref().is_some_and(|p| p.name.is_none())
+    }
+
+    fn user_name(&self) -> &str {
+        self.profile
+            .as_ref()
+            .and_then(|p| p.name.as_deref())
+            .unwrap_or("User Name")
+    }
+
     pub fn view(&self) -> Element<'_, Message> {
         let page = self.page_content();
-        let content = if self.updater.visible {
+        let content = if self.needs_name() {
+            stack![
+                crate::ui::blur::Blur::new(page),
+                iced::widget::opaque(crate::ui::name_prompt::view(
+                    &self.name_draft,
+                    self.name_error.as_deref()
+                ))
+            ]
+            .into()
+        } else if self.picture.modal() {
+            stack![
+                crate::ui::blur::Blur::new(page),
+                iced::widget::opaque(crate::ui::picture_prompt::view(&self.picture))
+            ]
+            .into()
+        } else if self.updater.visible {
             stack![
                 page,
                 iced::widget::opaque(crate::ui::update_prompt::view(&self.updater))
@@ -560,8 +721,9 @@ impl App {
         } else {
             page
         };
-        let poll = (self.updater.pending() || self.dashboard_reply.is_some())
-            .then(|| Instant::now() + Duration::from_millis(50));
+        let poll =
+            (self.updater.pending() || self.dashboard_reply.is_some() || self.picture.busy())
+                .then(|| Instant::now() + Duration::from_millis(50));
         let timer = if self.page == Page::Typing {
             self.main.next_tick()
         } else {
@@ -573,6 +735,7 @@ impl App {
             next,
             matches!(self.page, Page::Transition { .. }),
         )
+        .text_input(self.needs_name())
         .into()
     }
 }
@@ -618,6 +781,10 @@ mod tests {
 
     fn app(target: &str) -> App {
         App {
+            profile: None,
+            picture: crate::profile_picture::Picture::default(),
+            name_draft: String::new(),
+            name_error: None,
             score_writer: None,
             updater: typerr::update::Updater::default(),
             dashboard: None,
@@ -641,6 +808,50 @@ mod tests {
             focused: true,
             settings: crate::settings::Settings::default(),
         }
+    }
+
+    #[test]
+    fn picture_modal_blocks_navigation_and_keeps_draft_until_save_or_discard() {
+        let mut app = App::default();
+        app.update(Message::Dashboard);
+        app.picture.crop = Some(crate::profile_picture::Crop::new(
+            crate::profile_picture::placeholder(),
+        ));
+        let avatar = app.picture.avatar.clone();
+        for message in [
+            Message::BackToTyping,
+            Message::Next,
+            Message::Retry,
+            Message::SelectMode(Mode::Time),
+            key(Key::Character("x".into()), Some("x"), Modifiers::empty()),
+            key(Key::Named(Named::Backspace), None, Modifiers::empty()),
+        ] {
+            app.update(message);
+            assert_eq!(app.page, Page::Dashboard);
+            assert_eq!(app.main.generation, 0);
+            assert_eq!(app.main.session.position(), 0);
+        }
+        app.update(key(Key::Named(Named::Tab), None, Modifiers::empty()));
+        assert_eq!(app.picture.focus, 0);
+        app.update(key(Key::Named(Named::ArrowRight), None, Modifiers::empty()));
+        assert!(app.picture.crop.as_ref().unwrap().zoom > 1.);
+        app.update(Message::ZoomPicture(3.));
+        app.update(Message::PanPicture(iced::Vector::new(10., 20.)));
+        assert_eq!(
+            app.picture.crop.as_ref().unwrap().offset,
+            iced::Vector::new(10., 20.)
+        );
+        app.update(Message::SavePicture); // no user path in Default: show a retryable error
+        assert!(app.picture.error.is_some());
+        assert_eq!(app.picture.avatar, avatar);
+        app.update(key(Key::Named(Named::Escape), None, Modifiers::empty()));
+        assert!(!app.picture.modal());
+        assert_eq!(app.picture.avatar, avatar);
+        app.update(key(Key::Named(Named::Tab), None, Modifiers::empty()));
+        assert_eq!(app.page, Page::Typing);
+        assert_eq!(app.main.generation, 1);
+        app.update(Message::ChoosePicture); // never open an OS dialog on Typing
+        assert!(!app.picture.busy());
     }
 
     #[test]
@@ -1172,6 +1383,81 @@ mod tests {
         let click = |app: &mut App, x, y, button| {
             click_at_size(app, x, y, button, iced::Size::new(700., 400.))
         };
+        let profile_dir = tempfile::tempdir().unwrap();
+        let profile_path = profile_dir.path().join("settings.json");
+        app.profile = Some(crate::settings::Profile::at(profile_path.clone(), None));
+        for (x, y, button) in [
+            (615., 45., mouse::Button::Left),
+            (377., 45., mouse::Button::Right),
+            (350., 245., mouse::Button::Left),
+        ] {
+            click(&mut app, x, y, button);
+            assert!(app.needs_name());
+            assert_eq!(app.page, Page::Typing);
+            assert_eq!(app.main.amount_picker, None);
+        }
+        for message in [
+            Message::Dashboard,
+            Message::SelectMode(Mode::Time),
+            Message::ToggleNumbers,
+            key(Key::Named(Named::Escape), None, Modifiers::empty()),
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            key(Key::Character("x".into()), Some("x"), Modifiers::empty()),
+        ] {
+            app.update(message);
+        }
+        assert_eq!(app.main.session.position(), 0);
+        assert_eq!(app.main.generation, 0);
+        assert_eq!(app.main.mode, Mode::Words);
+        assert!(app.main.started.is_none());
+        // Route committed keyboard text through the real native text input.
+        let mut view = app.view();
+        let mut tree = Tree::new(&view);
+        let size = iced::Size::new(700., 400.);
+        let node = view.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &layout::Limits::new(iced::Size::ZERO, size),
+        );
+        let Message::Native(text_event) =
+            key(Key::Character("ë".into()), Some("ë"), Modifiers::empty())
+        else {
+            unreachable!()
+        };
+        let mut messages = Vec::new();
+        for event in [
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            text_event,
+        ] {
+            view.as_widget_mut().update(
+                &mut tree,
+                &event,
+                Layout::new(&node),
+                mouse::Cursor::Available(iced::Point::new(300., 200.)),
+                &renderer,
+                &mut clipboard::Null,
+                &mut Shell::new(&mut messages),
+                &iced::Rectangle::with_size(size),
+            );
+        }
+        drop(view);
+        for message in messages {
+            app.update(message);
+        }
+        assert_eq!(app.name_draft, "ë");
+        assert_eq!(app.main.session.position(), 0);
+        app.update(Message::NameChanged("abcdefghijklmnopq".into()));
+        assert_eq!(app.name_draft, "abcdefghijklmnop");
+        click(&mut app, 350., 245., mouse::Button::Left);
+        assert!(!app.needs_name());
+        assert_eq!(app.user_name(), "abcdefghijklmnop");
+        assert_eq!(
+            crate::settings::Profile::at(profile_path, None)
+                .name
+                .as_deref(),
+            Some("abcdefghijklmnop")
+        );
+        app.profile = None;
         app.updater.phase = typerr::update::Phase::Available;
         app.updater.visible = true;
         click(&mut app, 615., 45., mouse::Button::Left);

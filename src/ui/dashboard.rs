@@ -1,9 +1,10 @@
 //! Figma Dashboard 86:50, using completed-test history and a native histogram.
+use super::chrome::fitted_size;
 use super::{chrome, theme};
 use crate::app::Message;
 use canvas::{Frame, Path, Stroke, Text};
 use iced::advanced::text::{self as native_text, Paragraph};
-use iced::widget::{button, canvas, container, responsive, stack, svg, text, tooltip};
+use iced::widget::{button, canvas, container, responsive, stack, text, tooltip};
 use iced::{Element, Font, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 use typerr::storage::{DashboardData, TestMode};
 
@@ -78,23 +79,6 @@ fn duration(seconds: f64) -> String {
     }
 }
 
-/// Fit actual renderer-measured glyphs, including unusually large saved values.
-fn fitted_size(content: &str, font: Font, size: f32, width: f32) -> f32 {
-    type NativeParagraph = <Renderer as native_text::Renderer>::Paragraph;
-    let paragraph = NativeParagraph::with_text(native_text::Text {
-        content,
-        bounds: Size::INFINITE,
-        size: size.into(),
-        line_height: native_text::LineHeight::Relative(1.25),
-        font,
-        align_x: native_text::Alignment::Left,
-        align_y: iced::alignment::Vertical::Top,
-        shaping: native_text::Shaping::Basic,
-        wrapping: native_text::Wrapping::None,
-    });
-    size * (width / paragraph.min_width().max(1.)).min(1.)
-}
-
 fn label(frame: &mut Frame, value: &str, rect: Rectangle, size: f32, font: Font) {
     scaled_text(
         frame,
@@ -163,6 +147,7 @@ fn rotated(frame: &mut Frame, value: &str, position: Point, size: f32, font: Fon
 }
 
 struct DashboardCanvas<'a> {
+    name: &'a str,
     data: Option<&'a DashboardData>,
 }
 impl DashboardCanvas<'_> {
@@ -275,7 +260,12 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
             );
         }
         for (value, y, size, font) in [
-            ("Eric", 97., 20., theme::SEMIBOLD_FONT),
+            (
+                self.name,
+                97.,
+                fitted_size(self.name, theme::SEMIBOLD_FONT, 20., 190.),
+                theme::SEMIBOLD_FONT,
+            ),
             ("Professional Typist", 122., 14., theme::ITALIC_FONT),
             ("Joined 4th January, 2026", 140., 10., theme::FONT),
         ] {
@@ -409,20 +399,27 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
     }
 }
 
-pub fn view(data: Option<&DashboardData>) -> Element<'_, Message> {
+pub fn view<'a>(
+    data: Option<&'a DashboardData>,
+    name: &'a str,
+    avatar: &'a iced::widget::image::Handle,
+) -> Element<'a, Message> {
     responsive(move |size| {
         let scale = Scale::new(size);
         let content = scale.content();
         let avatar_center = scale.point(Point::new(95., 125.));
-        let avatar = svg(svg::Handle::from_memory(include_bytes!(
-            "../../assets/icons/profile-placeholder.svg"
-        )))
-        .width(80. * content)
-        .height(80. * content);
+        let avatar = super::picture_prompt::avatar(avatar, 80. * content);
+        let greeting_text = format!("Good Afternoon, {name}");
+        let greeting_size = fitted_size(
+            &greeting_text,
+            theme::USER_FONT,
+            20.,
+            (size.width - 260.).max(1.),
+        );
         let greeting = container(
-            text("Good Afternoon, Eric")
+            text(greeting_text)
                 .font(theme::USER_FONT)
-                .size(20)
+                .size(greeting_size)
                 .line_height(1.25)
                 .color(theme::ORANGE),
         )
@@ -438,7 +435,7 @@ pub fn view(data: Option<&DashboardData>) -> Element<'_, Message> {
             tooltip::Position::Bottom,
         );
         stack![
-            canvas(DashboardCanvas { data })
+            canvas(DashboardCanvas { data, name })
                 .width(iced::Fill)
                 .height(iced::Fill),
             chrome::brand(),

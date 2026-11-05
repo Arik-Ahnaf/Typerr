@@ -1,6 +1,7 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod app;
+mod profile_picture;
 mod settings;
 mod ui;
 
@@ -34,13 +35,19 @@ fn main() -> iced::Result {
     let startup = std::cell::RefCell::new(Some(startup));
     iced::application(
         move || {
-            app::App::new(
+            let app = app::App::new(
                 settings,
                 startup
                     .borrow_mut()
                     .take()
                     .expect("one application startup"),
-            )
+            );
+            let focus = if app.needs_name() {
+                iced::widget::operation::focus("name-input")
+            } else {
+                iced::Task::none()
+            };
+            (app, focus)
         },
         app::App::update_task,
         app::App::view,
@@ -52,6 +59,10 @@ fn main() -> iced::Result {
     )
     .font(
         include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-SemiBoldItalic.ttf")
+            .as_slice(),
+    )
+    .font(
+        include_bytes!("../assets/fonts/Google_Sans_Code/static/GoogleSansCode-Bold.ttf")
             .as_slice(),
     )
     .default_font(ui::theme::FONT)

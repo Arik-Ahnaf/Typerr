@@ -673,6 +673,77 @@ manually. Unsigned packages still obey each machine's pacman policy. No commit,
 push, tag, or release publication was performed. See UPDATING.md for recovery and
 release-contract requirements; preserve these platform qualifications in delivery.
 
+## Local Arch and Windows rebuild — 2026-11-04
+
+Built current commit `b5247cd` (1.1.0) with the checked-in packaging scripts,
+Rust 1.98.1, locked dependencies, and two Cargo jobs. No source changes were
+needed. Formatting, strict native all-target Clippy, all 99 tests (39 library,
+48 application/widget, 10 storage, 2 layout), native debug/release builds,
+Windows release all-target Clippy, and Windows MSVC release compilation passed.
+
+Fresh archive extraction verified matching executable/settings bytes, 24px
+configuration, executable permissions, pacman backup metadata and launcher/icon,
+font/Rust/word-list notices, and 324 Linux or 255 Windows dependency notices.
+No personal score databases or logs are included. Native ELF linkage resolves;
+both extracted Linux executables report `Typerr 1.1.0` through `--version`.
+The Windows PE is x86_64 GUI with a static C runtime, matching 1.1.0 file/product
+version resources, and all six logo images. ZIP CRC, desktop entry, shell syntax,
+and all distribution checksums passed.
+
+| Local artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `dist/typerr-1.1.0-arch-linux-x86_64.tar.gz` | 11,556,897 | `9cb06ef71cc8bcb9f143a0f1cbbaa51a79486f9893138c34142df7ac83d1654b` |
+| `dist/typerr-1.1.0-1-x86_64.pkg.tar.zst` | 10,911,169 | `890d9586e280ad979012bbb088165e3d11735e4fe219bee15979dff05af1ee9a` |
+| `dist/typerr-1.1.0-windows-x86_64.zip` | 9,090,527 | `8a2e4d32c698cd0a2fab44050feeadc9144f8b0dfd332b16bdec014594534c36` |
+
+`dist/SHA256SUMS` covers these artifacts and the retained older packages.
+Evidence: `target/packaging/build-2026-11-04/`, `arch.KYtDHA/`, and
+`windows.pKdZUG/` under `target/packaging/`. This build-only run did not repeat
+GUI interaction or updater installation checks; native Windows runtime remains
+unverified. Recommended next validation is manual target-platform startup/input
+and Windows updater testing. No installation, commit, push, tag, or release was
+performed, as requested.
+
+## First-launch Name Setter Modal — 2026-11-04
+
+Implemented Figma `122:10` as a native 300 × 150 centered card: 16px SemiBold
+heading, 200 × 30 rounded input with 12px Italic placeholder, and 60 × 20 Save
+button. First launch without a valid saved name blocks underlying controls,
+keyboard edits/restarts, and update offers. The input receives startup focus;
+Tab returns focus to it. Save/Enter validates a trimmed nonblank name of at most
+16 Unicode scalars, persists it, and unlocks the fresh typing session. Account,
+Dashboard profile, and greeting now use that name, with renderer-measured fitting.
+
+`settings::Profile` preserves unrelated JSON values with temporary-file atomic
+replacement. It falls back to user-owned settings for read-only installations;
+user configuration takes precedence on subsequent launches. Failed saves and
+malformed JSON keep the modal open with an error. No name was written to this
+checkout's settings or real user data during verification. Packages strip the
+builder's name. Settings UI and other profile editing remain out of scope.
+
+The inert backdrop renders the actual native page offscreen through the bundled
+software renderer, applies a cached three-pass separable blur, and adds 25% black
+dimming. Geometry changes invalidate the cache; name edits do not. Iced's
+image-without-codecs feature adds five locked transitive dependencies. Linux and
+Windows notice collection passes for the expanded graph.
+
+Validation: formatting, strict native all-target Clippy, all 103 tests (39 library,
+52 application/widget/settings, 10 storage, 2 layout), and locked debug/release
+builds pass. Tests cover Unicode/name limits, existing-key preservation, missing
+and invalid names, malformed-file preservation, read-only-install fallback,
+native text-input routing, and modal pointer/app-message isolation. The staged
+settings check confirms names are removed while other keys survive. Windows
+MSVC release all-target Clippy and static-runtime cross-build pass. Packaging
+scripts pass shell syntax checks; full distributable archives were not rebuilt.
+
+Inspected native XWayland renderer captures for blank/entered modal, saved account,
+Dashboard with a 16-character name, and resized 1000 × 650 modal. Evidence is in
+`target/name-verification/`. Window screenshots use 125% display scaling. The
+verification harness uses production views and private fixtures, not real history.
+Physical input, IME, native Wayland, and Windows runtime remain unverified; these
+are the next manual checks. No commit, push, publication, or installation occurred.
+The pre-existing local rebuild entry above was preserved.
+
 ## Score and Dashboard Figma spacing refresh — 2026-11-05
 
 Re-inspected live Figma frames `59:3` and `86:50`. Score now includes the
@@ -690,3 +761,60 @@ Validation in a clean checkout: formatting, strict locked all-target Clippy,
 all 99 tests (39 library, 48 application/widget, 10 storage, 2 layout), locked
 debug/release builds, and `git diff --check` pass with two Cargo jobs. This
 isolated verification did not repeat GUI or target-platform runtime checks.
+
+## Profile Picture Chooser — 2026-11-05
+
+Implemented the user-requested Dashboard avatar flow using live Figma `143:15`,
+the supplied modal PNG, and Discord's drag/zoom interaction reference. The
+centered native card retains the 200 × 230 layout, 170 × 130 preview, 100px crop
+ring, 155px zoom slider, and Discard/Save controls. Embedded the supplied default
+JPEG and pencil, downloaded the exact Figma close/circle SVGs, and registered
+the existing Bold font under its OFL notice. Hover darkens the avatar and reveals
+the pencil. The OS picker filters PNG/JPG/JPEG; the crop card appears after a
+successful selection. Drag, wheel/slider zoom, keyboard focus/zoom/pan, Escape,
+Discard, close, and Save are wired to real state.
+
+`src/profile_picture.rs` owns decoding, EXIF orientation, fractional crop
+sampling, circular display handles, and atomic user-config `avatar.png` writes.
+`src/ui/picture_prompt.rs` owns native presentation. Image work uses background
+threads and bounded input/working sizes. Saved images are independent of their
+original paths. Failed saves leave the draft and prior avatar intact. The modal
+blocks underlying actions and defers updater offers; startup acknowledgment and
+pending-worker redraw scheduling remain intact. Window close waits during an
+active save. No SQLite/schema, profile-name, session-score, or updater-install
+changes were made. The existing uncommitted name/spacing work was preserved.
+
+Added locked `image` PNG/JPEG codecs and `rfd` for Windows native and Linux desktop
+portal dialogs; documented portal/Zenity runtime requirements and Arch optional
+dependencies. User avatars are never staged in packages. Updated developer,
+build, packaging, and end-user guidance.
+
+Validation on Arch Linux with the pinned toolchain and two Cargo jobs:
+
+- Formatting, strict locked all-target Clippy, all 112 tests (39 library, 61
+  application/widget/settings/image, 10 storage, 2 layout), and locked native
+  debug/release builds pass. Crop tests cover extreme aspect ratios, fractional
+  zoom/pan boundaries, tiny images, invalid/nonfinite input, PNG/JPG round trips,
+  cancelled/discarded drafts, failed atomic writes, worker completion, modal
+  keyboard isolation, and unchanged prior avatars. Native renderer regression
+  checks ensure images cannot cover the crop ring or hover overlay.
+- Inspected native XWayland renderer captures at 125% display scaling: default,
+  crop, zoom/pan, saved/reloaded avatar, error, and 1000 × 650 modal. A software
+  renderer hover capture confirms darkening and the pencil. Fixed a backend
+  image/vector batching issue by using separate native widget layers. Captures
+  and isolated fixture harnesses are in `target/picture-verification/`; no
+  verification hooks were added to production startup and no real profile or
+  score history was changed.
+- Linux desktop-portal handoff was confirmed with a real native dialog request.
+  The dialog uses the Wayland desktop portal and was outside the available X11
+  automation surface, so full OS-dialog selection/cancellation and physical
+  dragging remain manual checks. The temporary test process was stopped to
+  release its dialog. Application state, decoding, crop, and persistence are
+  covered separately by automated checks.
+- Windows MSVC all-target release Clippy and static-runtime release cross-build
+  pass. Both target-filtered dependency notice collectors pass. Packaging shell
+  syntax and diff whitespace checks pass; distributable archives were not rebuilt.
+
+Native Windows execution and native Wayland app rendering remain unverified.
+Recommended follow-up is manual picture selection/dragging on both target
+platforms. No installation, commit, push, tag, or publication was performed.

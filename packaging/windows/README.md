@@ -13,14 +13,14 @@ elapsed time, and a performance graph. Corrected mistakes still affect accuracy.
 Completed results are saved automatically in `%LOCALAPPDATA%\Typerr\scores.db`.
 Abandoned tests are not saved. SQLite is bundled; no separate install is needed.
 Save failures are recorded in `scores-errors.log` beside the database when writable.
-Close Typerr before copying the database for a backup. Click Eric to view Dashboard statistics and all-time WPM ranges. Click the Typerr logo or press Tab to start a new test. Profile details are temporary placeholders.
+Close Typerr before copying the database for a backup. Click your name to view Dashboard statistics and all-time WPM ranges. Click the Typerr logo or press Tab to start a new test. The title and joined date remain placeholders.
 Next starts fresh text; Retry repeats the same text. Tab restarts either mode.
 The punctuation and number buttons independently change the generated text.
 
 The supplied settings use 24px text. Edit `font-size` to a number from 8 to 48,
 then restart. A `settings.json` in the launch working directory takes precedence
 over the file beside the executable. Missing or invalid settings use 16px.
-The application never writes settings.
+The application saves your name in settings; other values are preserved.
 
 This is an unsigned x64 MSVC release build cross-compiled on Arch Linux.
 The MSVC C runtime is linked statically. Windows system libraries and working
@@ -45,3 +45,26 @@ If an update is interrupted, start Typerr again to recover. Do not remove the
 `.typerr-update` folder while an update or recovery is running. Updater errors
 are logged to `updates-errors.log` beside the score database. The first version
 with this feature (1.1.0) must be installed manually.
+
+On first launch, enter a name (1–16 characters) and choose Save or press Enter.
+The name is saved as `name` in `settings.json` and used on the account button
+and Dashboard. The prompt blocks the app until saving succeeds. Existing valid
+names skip the prompt on subsequent launches.
+
+User settings take precedence over the working-directory and executable-adjacent
+files described above. When the original file cannot be written, Typerr preserves
+its other values in a user-owned `settings.json`: `$XDG_CONFIG_HOME/typerr/`
+(or `~/.config/typerr/`) on Linux, `%LOCALAPPDATA%/typerr/` on Windows. No administrator
+access is needed to save a name for a packaged installation. Invalid JSON is
+reported without overwriting it. Packages strip the builder's saved name.
+
+On Dashboard, hover over your profile picture to see the pencil, then click to
+choose a PNG or JPG. Drag the image to position it and use the slider or mouse
+wheel to zoom. Save applies the crop; Discard, ×, or Escape keeps your previous
+picture. Tab selects zoom/Discard/Save; arrows adjust zoom, Shift+arrows moves the
+image, and Enter activates a selected button. The saved picture is a separate
+512px `avatar.png` in the user configuration folder and survives moving/deleting
+the source image. Failed reads/saves show an error without changing your picture.
+
+Windows profile pictures are saved to `%LOCALAPPDATA%/typerr/avatar.png`.
+The image chooser uses the Windows native file dialog.

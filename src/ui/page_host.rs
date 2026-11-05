@@ -12,6 +12,7 @@ pub struct PageHost<'a> {
     next_tick: Option<Instant>,
     animating: bool,
     interactive: bool,
+    text_input: bool,
 }
 impl<'a> PageHost<'a> {
     pub fn new(
@@ -24,7 +25,12 @@ impl<'a> PageHost<'a> {
             next_tick,
             animating,
             interactive: !animating,
+            text_input: false,
         }
+    }
+    pub fn text_input(mut self, enabled: bool) -> Self {
+        self.text_input = enabled;
+        self
     }
     fn native(&self, event: &Event, shell: &mut Shell<'_, Message>) {
         match event {
@@ -95,7 +101,7 @@ impl Widget<Message, Theme, Renderer> for PageHost<'_> {
     ) {
         // Children still see window events (caret focus/resize), but never keys.
         // Disable pointer actions during the fade, including hover tooltips.
-        if !matches!(event, Event::Keyboard(_))
+        if (self.text_input || !matches!(event, Event::Keyboard(_)))
             && (self.interactive || matches!(event, Event::Window(_)))
         {
             self.content.as_widget_mut().update(
@@ -109,7 +115,21 @@ impl Widget<Message, Theme, Renderer> for PageHost<'_> {
                 viewport,
             );
         }
-        self.native(event, shell);
+        if self.text_input
+            && matches!(
+                event,
+                Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                    key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
+                    ..
+                })
+            )
+        {
+            shell.publish(Message::FocusName);
+            shell.capture_event();
+        }
+        if !self.text_input || !matches!(event, Event::Keyboard(_)) {
+            self.native(event, shell);
+        }
     }
     fn mouse_interaction(
         &self,

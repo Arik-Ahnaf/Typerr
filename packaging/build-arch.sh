@@ -41,7 +41,7 @@ file "$binary" | grep -q 'ELF 64-bit.*x86-64'
 ldd "$binary" | tee "$work/linkage.txt"
 if grep -q 'not found' "$work/linkage.txt"; then exit 1; fi
 install -m755 "$binary" "$payload/typerr"
-install -m644 settings.json "$payload/settings.json"
+python3 packaging/export-settings.py settings.json "$payload/settings.json"
 install -m644 packaging/README.md "$payload/README.md"
 install -m644 packaging/arch/typerr.desktop "$payload/typerr.desktop"
 install -m644 assets/icons/typerr-logo.svg "$payload/typerr-logo.svg"

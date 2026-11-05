@@ -1,8 +1,9 @@
 //! Native page chrome; all artwork is compiled into the executable.
 use super::theme;
 use crate::app::{Message, Mode};
+use iced::advanced::text::{self as native_text, Paragraph};
 use iced::widget::{Space, button, container, mouse_area, row, stack, svg, text};
-use iced::{Element, Fill, Font};
+use iced::{Element, Fill, Font, Renderer, Size};
 use typerr::words;
 
 fn icon(bytes: &'static [u8], width: f32, height: f32) -> svg::Svg<'static> {
@@ -71,15 +72,18 @@ pub fn brand() -> Element<'static, Message> {
 }
 
 /// Shared Dashboard entry point, disabled during the completion fade.
-pub fn user_name(enabled: bool) -> Element<'static, Message> {
+pub fn user_name(name: &str, enabled: bool) -> Element<'_, Message> {
     let account = button(
         container(
-            text("Eric")
+            text(name)
                 .font(theme::USER_FONT)
-                .size(20)
+                .size(fitted_size(name, theme::USER_FONT, 20., 178.))
                 .line_height(1.0),
         )
-        .center_x(70)
+        .padding([0, 11])
+        .width(iced::Length::Shrink)
+        .max_width(200)
+        .align_x(iced::Center)
         .center_y(30),
     )
     .padding(0)
@@ -336,4 +340,21 @@ pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
         .padding(iced::Padding::ZERO.left(20).right(20).bottom(22))
         .width(Fill)
         .into()
+}
+
+/// Fit actual renderer-measured glyphs, including unusually large saved values.
+pub(super) fn fitted_size(content: &str, font: Font, size: f32, width: f32) -> f32 {
+    type NativeParagraph = <Renderer as native_text::Renderer>::Paragraph;
+    let paragraph = NativeParagraph::with_text(native_text::Text {
+        content,
+        bounds: Size::INFINITE,
+        size: size.into(),
+        line_height: native_text::LineHeight::Relative(1.25),
+        font,
+        align_x: native_text::Alignment::Left,
+        align_y: iced::alignment::Vertical::Top,
+        shaping: native_text::Shaping::Basic,
+        wrapping: native_text::Wrapping::None,
+    });
+    size * (width / paragraph.min_width().max(1.)).min(1.)
 }

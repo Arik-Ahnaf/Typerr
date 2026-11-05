@@ -51,7 +51,7 @@ if grep -Ei 'Name: (VCRUNTIME|MSVCP|MSVCR|ucrtbase|api-ms-win-crt)[^ ]*\.dll' "$
     echo 'Unexpected dynamic MSVC runtime dependency.' >&2; exit 1
 fi
 install -m755 "$binary" "$payload/typerr.exe"
-install -m644 settings.json "$payload/settings.json"
+python3 packaging/export-settings.py settings.json "$payload/settings.json"
 install -m644 packaging/windows/README.md "$payload/README.md"
 install -m644 assets/fonts/Google_Sans_Code/OFL.txt "$payload/notices/Google-Sans-Code-OFL.txt"
 install -m644 assets/fonts/Jomhuria/OFL.txt "$payload/notices/Jomhuria-OFL.txt"

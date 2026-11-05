@@ -6,3 +6,8 @@ pub mod score;
 pub mod theme;
 pub mod typing_panel;
 pub mod update_prompt;
+
+pub mod blur;
+pub mod name_prompt;
+
+pub mod picture_prompt;

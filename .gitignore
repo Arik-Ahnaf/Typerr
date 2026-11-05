@@ -33,3 +33,5 @@ scores.db-shm
 !/assets/fonts/Google_Sans_Code/static/GoogleSansCode-Medium.ttf
 !/assets/fonts/Google_Sans_Code/static/GoogleSansCode-SemiBold.ttf
 !/assets/fonts/Google_Sans_Code/static/GoogleSansCode-Light.ttf
+
+!/assets/fonts/Google_Sans_Code/static/GoogleSansCode-Bold.ttf

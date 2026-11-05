@@ -4,14 +4,14 @@
 
 Typerr is a native Rust typing application inspired by Monkeytype. Responsive input, accurate text layout, and smooth caret movement take priority over feature count. Target platforms are Windows and Arch Linux. Develop through small, independently testable alpha versions.
 
-The current updater follow-up (`1.1.0`) contains Main Typing, Score, and Dashboard pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the foreground color; inactive icons use Comment. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; completed-test SQLite history and Dashboard read queries are authorized by the 2026-11-03 follow-up. The 2026-11-04 follow-up authorizes the native Dashboard with hardcoded profile data; profile storage, Settings, and editing existing settings remain excluded. The startup updater follow-up authorizes GitHub release checks, accepted downloads/installations, and temporary updater state. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
+The current updater follow-up (`1.1.0`) contains Main Typing, Score, and Dashboard pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the foreground color; inactive icons use Comment. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; completed-test SQLite history and Dashboard read queries are authorized by the 2026-11-03 follow-up. The 2026-11-04 follow-up authorizes the native Dashboard with hardcoded profile data; the Name Setter follow-up authorizes saving the user name in settings.json. The 2026-11-05 Profile Picture Chooser follow-up authorizes selecting, cropping, and saving an avatar. Settings UI and remaining profile fields stay excluded. The startup updater follow-up authorizes GitHub release checks, accepted downloads/installations, and temporary updater state. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
 
 The UI must remain native. Do not add HTML, CSS, JavaScript, webviews, or embedded browsers.
 
 ## Technical decisions
 
 - Rust edition 2024, pinned toolchain `1.98.1`.
-- Iced `0.14.0`, native default render backends plus the `advanced`, `svg`, and `canvas` features for a custom typing widget.
+- Iced `0.14.0`, native default render backends plus the `advanced`, `svg`, `canvas`, and `image-without-codecs` features for a custom typing widget.
 - `rand` `0.10.3` for word selection, with injectable seeded randomness for tests.
 - Bundle an original curated list of approximately 200 common lowercase ASCII English words and the existing static Google Sans Code Regular font. Load both from compiled assets; do not require the source checkout or network at runtime.
 - Commit `Cargo.lock`. Add another dependency only for a concrete need; no additional shaping crate is planned.
@@ -94,7 +94,7 @@ Before delivery, review all acceptance criteria, architecture boundaries, test r
 
 ## Startup settings
 
-`src/settings.rs` reads `settings.json` once at startup, preferring the working directory and then the executable directory. Missing or invalid configuration uses 16px; malformed/unreadable files emit a diagnostic. The sole option is numeric `font-size` (8–48 logical pixels). Restart to apply edits. Renderer measurement, wrapping, glyphs, caret, clipping, and scroll increments share the configured metrics; header/footer and counter/timer sizes remain unchanged. Runtime `serde_json` reuses the existing locked build dependency. Tests use defaults independently of local settings.
+`src/settings.rs` reads `settings.json` once at startup, preferring the working directory and then the executable directory. Missing or invalid configuration uses 16px; malformed/unreadable files emit a diagnostic. The typing option is numeric `font-size` (8–48 logical pixels); `name` stores the first-launch profile name. Restart to apply edits. Renderer measurement, wrapping, glyphs, caret, clipping, and scroll increments share the configured metrics; header/footer and counter/timer sizes remain unchanged. Runtime `serde_json` reuses the existing locked build dependency. Tests use defaults independently of local settings.
 
 ## Score page and crossfade
 
@@ -116,7 +116,7 @@ Only one bar is open at a time. Selection, outside click, Escape, accepted typin
 
 ## Refreshed page chrome — 2026-10-29
 
-Figma frames `54:22` and `59:3` now place a shared 70 × 30 account button 50px from the right and 30px from the top. Display hardcoded `Eric` with bundled Google Sans Code SemiBoldItalic at 20px, an 8px corner radius, control background, and Comment text changing to foreground on hover/press. Clicking opens Dashboard (authorized 2026-11-04). Disable pointer actions during the fade while keeping the account visible with the shared brand.
+Figma frames `54:22` and `59:3` now place a shared 70 × 30 account button 50px from the right and 30px from the top. Display the saved user name with bundled Google Sans Code SemiBoldItalic at 20px, an 8px corner radius, control background, and Comment text changing to foreground on hover/press. Clicking opens Dashboard (authorized 2026-11-04). Disable pointer actions during the fade while keeping the account visible with the shared brand.
 
 The typing control groups form a centered 170 × 30 row at y=30 (x=265 at 700px); amount menus retain their 170 × 30 size at y=65. Score metrics begin at x=50, the speed-axis title at x=125, tick labels at x=150, and the plot at x=170; retain room for the Errors axis at the right. Lower statistics begin at x=180/264/410. Score also shows the centered 50 × 25 `Tab` hint at (252, 37), followed by `to start a new test`; it is presentation only and uses the existing fresh-Tab behavior. Preserve measured data, the four-row typing viewport, configured font sizing, and all existing completion/input policies.
 
@@ -151,9 +151,8 @@ Keep the avatar circular. Header branding stays at its original fixed size,
 50px from the left and 30px from the top, with a fixed 124 × 40 Home hit target.
 The greeting stays 20px at top=37/right=70. Neither header element scales.
 Do not cap Dashboard at 700 × 400 or add outer centering margins. The pink 610 × 100 area at (45, 287) is only chart placement; the centered 500 × 2 foreground rule at (100, 275) is visible chart chrome. The four cards begin at x=45/355. Use the renderer-measured top heading as the fixed left anchor for both headings and values in each lifetime-summary column; keep best-result columns centered. Render a transparent native Canvas histogram from `All time wpm bar chart.png`.
-Reuse the shared brand and compiled palette. Bundle the supplied profile circle
-SVG and existing Google Sans Code Italic/Medium/SemiBold/Light font faces with
-OFL coverage. Profile name Eric, title, joined date, and greeting are hardcoded.
+Reuse the shared brand and compiled palette. Bundle the supplied default profile JPEG and existing Google Sans Code Italic/Medium/SemiBold/Light font faces with
+OFL coverage. The profile name and greeting use the saved name; title and joined date remain hardcoded.
 Dashboard typography is independent of typing font settings.
 
 Account clicks from Typing or Score open Dashboard; ignore them during fades.
@@ -197,3 +196,51 @@ history. Package-owned installations must use authenticated pacman, never direct
 file replacement or weakened signature policy. Temporary downloads, lock files,
 recovery journals, and updater diagnostics are authorized; no settings UI,
 automatic publication, or application data migration is authorized.
+
+## First-launch name — 2026-11-04
+
+Figma Name Setter Modal `122:10` is a centered 300 × 150 native card. Require
+1–16 Unicode scalar characters after trimming, excluding control characters.
+No name means onboarding on launch; valid saved names skip it. Save or Enter
+persists `name` before unlocking Typing. Escape, Tab, background clicks, and
+text must not operate underlying pages. Tab returns focus to the field.
+Defer update offers while onboarding; retain startup acknowledgment.
+
+`settings::Profile` preserves unrelated JSON keys and atomically replaces the
+settings file. User settings take priority, then working-directory settings,
+then executable-adjacent settings. If the original location is unwritable,
+save a merged copy to `$XDG_CONFIG_HOME/typerr/settings.json` (HOME/.config
+fallback) or `%LOCALAPPDATA%/typerr/settings.json`. Both font settings and name
+load from the same selected file. Show write/parse failures in the modal and
+keep it open. Do not overwrite malformed configuration or store names in SQLite.
+
+The backdrop uses a cached native software-rendered page with a three-pass
+separable blur and a 25% black overlay. Recompute for changed window geometry;
+keep modal text sharp. Image rendering is enabled without image codecs.
+Account and Dashboard labels use the saved name and accommodate 16 characters.
+Packaging removes `name` from staged settings; never ship a builder's profile.
+
+## Profile picture chooser — 2026-11-05
+
+Figma `143:15` and `design_references/Pfp Chooser Modal.png` define the centered
+200 × 230 native Edit Image card. Dashboard uses the bundled
+`assets/icons/profile-placeholder.jpg` by default. Hover darkens the circular
+avatar and shows the supplied pencil; click opens the OS PNG/JPG chooser.
+After selection, drag to position, use the slider or wheel to zoom 1–4×, and
+choose Save or Discard. Close/Escape discards; outside clicks do nothing.
+Tab/Shift+Tab cycles zoom, Discard, Save; arrows adjust focused zoom and Shift
+with arrows pans. No modal keys or pointer events navigate/edit underlying pages.
+Defer update offers until the chooser/editor closes. Keep this UI native.
+
+`src/profile_picture.rs` owns bounded decoding, EXIF orientation, crop geometry,
+and atomic avatar persistence; `src/ui/picture_prompt.rs` owns native interaction
+and rendering. The PNG/JPEG `image` codecs and `rfd` native dialog are concrete
+new dependencies. Decode/save run on background threads; poll only while pending.
+Keep the crop inside source bounds, preserve aspect ratio, and display a circular
+mask. Save a 512 × 512 PNG to the user configuration folder as `avatar.png`
+(Linux XDG_CONFIG_HOME/typerr or HOME/.config/typerr; Windows LOCALAPPDATA/typerr).
+Keep the previous avatar until saving succeeds. Discard, picker cancellation,
+and read/write failures preserve it; failures are visible and retryable. Do not
+modify the original image, settings JSON, or SQLite. `App::default` performs no
+filesystem access. Limit inputs to 20 MiB, 8192px per axis and 128 MiB decoder
+allocation; reduce working copies to 2048px per axis. Never package user avatars.

@@ -11,6 +11,8 @@ depends=('glibc' 'gcc-libs' 'libx11' 'libxcursor' 'libxi' 'libxrandr'
          'libxkbcommon' 'libxkbcommon-x11' 'wayland' 'libglvnd'
          'vulkan-icd-loader' 'libxcb')
 optdepends=('polkit: authenticate in-app package upgrades (graphical authentication agent required)'
+            'xdg-desktop-portal: native profile image chooser (desktop backend required)'
+            'zenity: fallback profile image chooser'
             'xdg-utils: open footer links in the default browser'
             'vulkan-driver: hardware Vulkan rendering')
 backup=('usr/lib/typerr/settings.json')

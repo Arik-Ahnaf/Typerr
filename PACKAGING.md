@@ -66,7 +66,7 @@ under `/usr/share/licenses/typerr/`.
 Both artifacts copy the checkout's current settings, presently 24px. Edit
 `font-size` (8–48) and restart; a settings file in the launch working directory
 takes precedence over the executable-adjacent file. Editing installed
-settings requires administrator access. The application never writes settings.
+settings requires administrator access. The application saves your name in settings; other values are preserved.
 
 Completed scores are written to the user's data directory, not `/usr/lib/typerr`
 or the extracted application folder. See [STORAGE.md](STORAGE.md) for exact paths.
@@ -136,3 +136,29 @@ for in-app pacman upgrades. Portable replacement requires a writable application
 folder. New HTTPS/archive/checksum dependency notices are collected by the
 existing locked-graph notice collector. No updater service or startup task is
 installed; update checks run only when the user launches Typerr.
+
+On first launch, enter a name (1–16 characters) and choose Save or press Enter.
+The name is saved as `name` in `settings.json` and used on the account button
+and Dashboard. The prompt blocks the app until saving succeeds. Existing valid
+names skip the prompt on subsequent launches.
+
+User settings take precedence over the working-directory and executable-adjacent
+files described above. When the original file cannot be written, Typerr preserves
+its other values in a user-owned `settings.json`: `$XDG_CONFIG_HOME/typerr/`
+(or `~/.config/typerr/`) on Linux, `%LOCALAPPDATA%/typerr/` on Windows. No administrator
+access is needed to save a name for a packaged installation. Invalid JSON is
+reported without overwriting it. Packages strip the builder's saved name.
+
+On Dashboard, hover over your profile picture to see the pencil, then click to
+choose a PNG or JPG. Drag the image to position it and use the slider or mouse
+wheel to zoom. Save applies the crop; Discard, ×, or Escape keeps your previous
+picture. Tab selects zoom/Discard/Save; arrows adjust zoom, Shift+arrows moves the
+image, and Enter activates a selected button. The saved picture is a separate
+512px `avatar.png` in the user configuration folder and survives moving/deleting
+the source image. Failed reads/saves show an error without changing your picture.
+
+Do not stage user `avatar.png` files. The default JPEG and modal SVGs are embedded;
+the added Bold font is covered by the existing Google Sans Code OFL notice.
+Retain the locked image-codec and native-dialog dependency notices. Linux file
+selection uses the desktop's XDG portal/FileChooser backend, falling back to
+Zenity; these are optional runtime dependencies for picture selection.
