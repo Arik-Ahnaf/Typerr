@@ -5,13 +5,20 @@ use crate::{
     profile_picture::{Crop, Picture},
 };
 use iced::{
-    Border, Color, Element, Event, Fill, Point, Rectangle, Renderer, Theme, Vector, mouse,
+    Border, Color, Element, Event, Fill, Point, Rectangle, Renderer, Size, Theme, Vector, mouse,
     widget::{
         Space, button,
         canvas::{self, Frame, Path},
-        column, container, row, slider, stack, svg, text,
+        column, container, responsive, row, scrollable, slider, stack, svg, text,
     },
 };
+
+fn modal_scale(size: Size, has_error: bool) -> f32 {
+    let height = if has_error { 290. } else { 230. };
+    ((size.width - 32.).max(1.) / 200.)
+        .min((size.height - 32.).max(1.) / height)
+        .min(2.)
+}
 
 pub fn avatar(handle: &iced::widget::image::Handle, size: f32) -> Element<'_, Message> {
     stack![
@@ -135,8 +142,10 @@ impl canvas::Program<Message> for Preview<'_> {
                 .map(|_| canvas::Action::request_redraw().and_capture()),
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
                 state.start.map(|(start, offset)| {
-                    canvas::Action::publish(Message::PanPicture(offset + (*position - start)))
-                        .and_capture()
+                    canvas::Action::publish(Message::PanPicture(
+                        offset + (*position - start) / (bounds.width / 170.),
+                    ))
+                    .and_capture()
                 })
             }
             Event::Mouse(mouse::Event::WheelScrolled { delta }) if cursor.is_over(bounds) => {
@@ -165,8 +174,18 @@ impl canvas::Program<Message> for Preview<'_> {
             &Path::rectangle(Point::ORIGIN, bounds.size()),
             theme::CONTROL_BACKGROUND,
         );
+        // A clipped subframe has its own transform. Keep the image rectangle and
+        // its clip in actual canvas pixels instead of relying on the parent scale.
+        let scale = bounds.width / 170.;
+        let crop = self.0.bounds(Point::new(85., 65.));
+        let image_bounds = Rectangle {
+            x: crop.x * scale,
+            y: crop.y * scale,
+            width: crop.width * scale,
+            height: crop.height * scale,
+        };
         frame.with_clip(Rectangle::with_size(bounds.size()), |frame| {
-            frame.draw_image(self.0.bounds(Point::new(85., 65.)), &self.0.source.handle);
+            frame.draw_image(image_bounds, &self.0.source.handle);
         });
         vec![frame.into_geometry()]
     }
@@ -200,9 +219,11 @@ impl canvas::Program<Message> for Mask {
         _: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
+        frame.scale(bounds.width / 170.);
+        let size = Size::new(170., 130.);
         // Dim the rejected image area; the circular selection remains clear.
         let mask = Path::new(|p| {
-            p.rectangle(Point::ORIGIN, bounds.size());
+            p.rectangle(Point::ORIGIN, size);
             p.circle(Point::new(85., 65.), 48.);
         });
         frame.fill(
@@ -214,8 +235,8 @@ impl canvas::Program<Message> for Mask {
         );
         // Cover just the rounded outer corners, retaining the exact preview slot.
         let corners = Path::new(|p| {
-            p.rectangle(Point::ORIGIN, bounds.size());
-            p.rounded_rectangle(Point::ORIGIN, bounds.size(), 8.into());
+            p.rectangle(Point::ORIGIN, size);
+            p.rounded_rectangle(Point::ORIGIN, size, 8.into());
         });
         frame.fill(
             &corners,
@@ -227,9 +248,14 @@ impl canvas::Program<Message> for Mask {
         vec![frame.into_geometry()]
     }
 }
-fn at<'a>(content: impl Into<Element<'a, Message>>, x: f32, y: f32) -> Element<'a, Message> {
+fn at<'a>(
+    content: impl Into<Element<'a, Message>>,
+    x: f32,
+    y: f32,
+    scale: f32,
+) -> Element<'a, Message> {
     container(content)
-        .padding(iced::Padding::ZERO.left(x).top(y))
+        .padding(iced::Padding::ZERO.left(x * scale).top(y * scale))
         .into()
 }
 fn action(
@@ -238,16 +264,18 @@ fn action(
     primary: bool,
     enabled: bool,
     focused: bool,
+    scale: f32,
 ) -> Element<'static, Message> {
+    let scaled = move |value| value * scale;
     button(
         text(label)
             .font(theme::MEDIUM_FONT)
-            .size(12)
+            .size(scaled(12.))
             .line_height(1.25)
             .center(),
     )
-    .width(70)
-    .height(20)
+    .width(scaled(70.))
+    .height(scaled(20.))
     .padding(0)
     .on_press_maybe(enabled.then_some(message))
     .style(move |_, status| button::Style {
@@ -261,9 +289,9 @@ fn action(
         ),
         text_color: theme::CORRECT,
         border: Border {
-            radius: 8.into(),
+            radius: scaled(8.).into(),
             width: if focused || status == button::Status::Hovered {
-                1.
+                scaled(1.)
             } else {
                 0.
             },
@@ -275,6 +303,11 @@ fn action(
 }
 
 pub fn view(picture: &Picture) -> Element<'_, Message> {
+    responsive(move |size| view_scaled(picture, modal_scale(size, picture.error.is_some()))).into()
+}
+
+fn view_scaled(picture: &Picture, scale: f32) -> Element<'_, Message> {
+    let scaled = move |value| value * scale;
     let busy = picture.busy();
     // The crop card appears only after the OS picker returns an image.
     if busy && picture.crop.is_none() {
@@ -283,21 +316,24 @@ pub fn view(picture: &Picture) -> Element<'_, Message> {
     let preview: Element<'_, Message> = if let Some(crop) = &picture.crop {
         stack![
             canvas::Canvas::new(Preview(crop, !busy))
-                .width(170)
-                .height(130),
-            canvas::Canvas::new(Mask).width(170).height(130),
+                .width(scaled(170.))
+                .height(scaled(130.)),
+            canvas::Canvas::new(Mask)
+                .width(scaled(170.))
+                .height(scaled(130.)),
             at(
                 svg(svg::Handle::from_memory(
                     include_bytes!("../../assets/icons/pfp-selection.svg").as_slice()
                 ))
-                .width(100)
-                .height(100),
+                .width(scaled(100.))
+                .height(scaled(100.)),
                 35.,
-                15.
+                15.,
+                scale,
             )
         ]
-        .width(170)
-        .height(130)
+        .width(scaled(170.))
+        .height(scaled(130.))
         .into()
     } else {
         container(
@@ -306,23 +342,23 @@ pub fn view(picture: &Picture) -> Element<'_, Message> {
             } else {
                 "Cannot open image"
             })
-            .size(12)
+            .size(scaled(12.))
             .center(),
         )
-        .center_x(170)
-        .center_y(130)
+        .center_x(scaled(170.))
+        .center_y(scaled(130.))
         .into()
     };
     let close = button(
         svg(svg::Handle::from_memory(
             include_bytes!("../../assets/icons/pfp-close.svg").as_slice(),
         ))
-        .width(13)
-        .height(12.2),
+        .width(scaled(13.))
+        .height(scaled(12.2)),
     )
-    .width(20)
-    .height(20)
-    .padding(3)
+    .width(scaled(20.))
+    .height(scaled(20.))
+    .padding(scaled(3.))
     .on_press_maybe((!busy).then_some(Message::DiscardPicture))
     .style(|_, status| button::Style {
         background: (status == button::Status::Hovered).then_some(theme::CONTROL_BACKGROUND.into()),
@@ -331,18 +367,18 @@ pub fn view(picture: &Picture) -> Element<'_, Message> {
     let zoom: Element<'_, Message> = if let Some(crop) = &picture.crop {
         slider(1.0..=4.0, crop.zoom, Message::ZoomPicture)
             .step(0.01_f32)
-            .width(155)
-            .height(12)
+            .width(scaled(155.))
+            .height(scaled(12.))
             .style(move |_, _| slider::Style {
                 rail: slider::Rail {
                     backgrounds: (theme::CORRECT.into(), theme::CORRECT.into()),
-                    width: 4.,
-                    border: Border::default().rounded(2),
+                    width: scaled(4.),
+                    border: Border::default().rounded(scaled(2.)),
                 },
                 handle: slider::Handle {
-                    shape: slider::HandleShape::Circle { radius: 6. },
+                    shape: slider::HandleShape::Circle { radius: scaled(6.) },
                     background: theme::PENDING.into(),
-                    border_width: if picture.focus == 0 { 1. } else { 0. },
+                    border_width: if picture.focus == 0 { scaled(1.) } else { 0. },
                     border_color: theme::CORRECT,
                 },
             })
@@ -358,14 +394,15 @@ pub fn view(picture: &Picture) -> Element<'_, Message> {
                         weight: iced::font::Weight::Bold,
                         ..theme::FONT
                     })
-                    .size(12)
+                    .size(scaled(12.))
                     .line_height(1.25),
                 15.,
-                10.
+                10.,
+                scale,
             ),
-            at(close, 170., 6.5),
-            at(preview, 15., 30.),
-            at(zoom, 22.5, 170.),
+            at(close, 170., 6.5, scale),
+            at(preview, 15., 30., scale),
+            at(zoom, 22.5, 170., scale),
             at(
                 row![
                     action(
@@ -373,7 +410,8 @@ pub fn view(picture: &Picture) -> Element<'_, Message> {
                         Message::DiscardPicture,
                         false,
                         !busy,
-                        picture.focus == 1
+                        picture.focus == 1,
+                        scale,
                     ),
                     action(
                         if picture.saving() {
@@ -384,27 +422,37 @@ pub fn view(picture: &Picture) -> Element<'_, Message> {
                         Message::SavePicture,
                         true,
                         !busy && picture.crop.is_some(),
-                        picture.focus == 2
+                        picture.focus == 2,
+                        scale,
                     )
                 ]
-                .spacing(10),
+                .spacing(scaled(10.)),
                 25.,
-                190.
+                190.,
+                scale,
             ),
         ]
-        .width(200)
-        .height(230),
+        .width(scaled(200.))
+        .height(scaled(230.)),
     )
-    .style(|_| container::Style {
+    .style(move |_| container::Style {
         background: Some(theme::BACKGROUND.into()),
-        border: Border::default().rounded(8),
+        border: Border::default().rounded(scaled(8.)),
         text_color: Some(theme::CORRECT),
         ..Default::default()
     });
-    let mut contents = column![card].align_x(iced::Center).spacing(10);
+    let mut contents = column![card].align_x(iced::Center).spacing(scaled(10.));
     if let Some(error) = &picture.error {
-        contents = contents
-            .push(container(text(error).size(12).color(theme::INCORRECT).center()).max_width(440));
+        contents = contents.push(
+            scrollable(
+                text(error)
+                    .size(scaled(10.))
+                    .color(theme::INCORRECT)
+                    .center(),
+            )
+            .width(scaled(200.))
+            .height(scaled(50.)),
+        );
     }
     container(contents)
         .center_x(Fill)
@@ -460,7 +508,7 @@ mod tests {
         let crop = Crop::new(crate::profile_picture::placeholder());
         let preview = Preview(&crop, true);
         let mut state = Drag::default();
-        let bounds = Rectangle::new(Point::new(100., 100.), iced::Size::new(170., 130.));
+        let bounds = Rectangle::new(Point::new(100., 100.), iced::Size::new(340., 260.));
         let cursor = mouse::Cursor::Available(Point::new(150., 150.));
         preview
             .update(
@@ -474,7 +522,7 @@ mod tests {
             .update(
                 &mut state,
                 &Event::Mouse(mouse::Event::CursorMoved {
-                    position: Point::new(190., 170.),
+                    position: Point::new(230., 190.),
                 }),
                 bounds,
                 cursor,
@@ -581,14 +629,113 @@ mod rendering_tests {
         let mut picture = Picture::default();
         picture.crop = Some(Crop::new(crate::profile_picture::placeholder()));
         let pixels = render(
-            view(&picture),
-            iced::Size::new(200., 230.),
+            view_scaled(&picture, 2.),
+            iced::Size::new(400., 460.),
             mouse::Cursor::Unavailable,
         );
-        let ring = (95 * 200 + 51) * 4;
+        let ring = (190 * 400 + 102) * 4;
         assert!(
             pixels[ring] > 230 && pixels[ring + 1] > 230,
             "crop ring must stay above the photograph"
         );
+    }
+
+    #[test]
+    fn preview_matches_saved_crop_across_window_sizes_zoom_and_pan() {
+        let dir = tempfile::tempdir().unwrap();
+        for (width, height) in [(320, 180), (180, 320)] {
+            let path = dir.path().join("gradient.png");
+            image::RgbImage::from_fn(width, height, |x, y| {
+                image::Rgb([(x * 220 / width) as u8, (y * 220 / height) as u8, 90])
+            })
+            .save(&path)
+            .unwrap();
+            let mut picture = Picture::default();
+            let mut crop = Crop::new(crate::profile_picture::read(&path).unwrap());
+            for zoom in [1., 2.5, 4.] {
+                crop.set_zoom(zoom);
+                crop.pan(Vector::new(15., -12.));
+                let saved = crop.output();
+                picture.crop = Some(crop.clone());
+                for size in [Size::new(700., 400.), Size::new(1000., 650.)] {
+                    let scale = modal_scale(size, false);
+                    let pixels = render(view(&picture), size, mouse::Cursor::Unavailable);
+                    let origin = Point::new(
+                        (size.width - 200. * scale) / 2.,
+                        (size.height - 230. * scale) / 2.,
+                    );
+                    // Sample well inside each quadrant, away from the mask/ring.
+                    for (dx, dy) in [(-20., -20.), (20., -20.), (-20., 20.), (20., 20.)] {
+                        let x = (origin.x + (100. + dx) * scale) as usize;
+                        let y = (origin.y + (95. + dy) * scale) as usize;
+                        let offset = (y * size.width as usize + x) * 4;
+                        let expected = saved.get_pixel(
+                            ((50. + dx) * 512. / 100.) as u32,
+                            ((50. + dy) * 512. / 100.) as u32,
+                        );
+                        for channel in 0..3 {
+                            assert!(
+                                pixels[offset + channel].abs_diff(expected[channel]) <= 5,
+                                "preview differs from saved crop at {size:?}, zoom {zoom}, point ({dx}, {dy})"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn bottom_of_both_buttons_remains_clickable_after_resizing() {
+        use iced::advanced::{Shell, clipboard};
+        let mut picture = Picture::default();
+        picture.crop = Some(Crop::new(crate::profile_picture::placeholder()));
+        let renderer = iced::futures::executor::block_on(Renderer::new(
+            theme::FONT,
+            16.into(),
+            Some("tiny-skia"),
+        ))
+        .unwrap();
+        let mut view = view(&picture);
+        let mut tree = Tree::new(&view);
+        for size in [
+            Size::new(1000., 650.),
+            Size::new(700., 400.),
+            Size::new(800., 450.),
+        ] {
+            let scale = modal_scale(size, false);
+            let node =
+                view.as_widget_mut()
+                    .layout(&mut tree, &renderer, &layout::Limits::new(size, size));
+            for (x, save) in [(60., false), (140., true)] {
+                let cursor = mouse::Cursor::Available(Point::new(
+                    (size.width - 200. * scale) / 2. + x * scale,
+                    (size.height - 230. * scale) / 2. + 208. * scale,
+                ));
+                let mut messages = Vec::new();
+                for event in [
+                    mouse::Event::ButtonPressed(mouse::Button::Left),
+                    mouse::Event::ButtonReleased(mouse::Button::Left),
+                ] {
+                    view.as_widget_mut().update(
+                        &mut tree,
+                        &Event::Mouse(event),
+                        Layout::new(&node),
+                        cursor,
+                        &renderer,
+                        &mut clipboard::Null,
+                        &mut Shell::new(&mut messages),
+                        &Rectangle::with_size(size),
+                    );
+                }
+                assert!(
+                    messages.iter().any(|message| matches!(
+                        (save, message),
+                        (true, Message::SavePicture) | (false, Message::DiscardPicture)
+                    )),
+                    "button clipped at {size:?}"
+                );
+            }
+        }
     }
 }

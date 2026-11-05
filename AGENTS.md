@@ -215,15 +215,22 @@ load from the same selected file. Show write/parse failures in the modal and
 keep it open. Do not overwrite malformed configuration or store names in SQLite.
 
 The backdrop uses a cached native software-rendered page with a three-pass
-separable blur and a 25% black overlay. Recompute for changed window geometry;
-keep modal text sharp. Image rendering is enabled without image codecs.
+separable blur and a 25% black overlay. Render the backdrop at half resolution,
+capped at 512px per axis, using an explicit renderer transform. Reuse the cached
+image during live resizing and rebuild after 120ms of settled geometry; keep
+modal layout and text sharp and immediate. Image rendering is enabled without image codecs.
 Account and Dashboard labels use the saved name and accommodate 16 characters.
 Packaging removes `name` from staged settings; never ship a builder's profile.
 
 ## Profile picture chooser — 2026-11-05
 
 Figma `143:15` and `design_references/Pfp Chooser Modal.png` define the centered
-200 × 230 native Edit Image card. Dashboard uses the bundled
+native Edit Image card. Uniformly fit the entire card and controls inside the
+window with 16px exterior margins, growing up to 400 × 460 (2× the reference).
+At 700 × 400 the card is 320 × 368. Reserve space for scrollable errors when
+present. Never resize the app window to fit the modal. Preview image bounds,
+clipping, crop ring, and drag coordinates share the actual display scale.
+Dashboard uses the bundled
 `assets/icons/profile-placeholder.jpg` by default. Hover darkens the circular
 avatar and shows the supplied pencil; click opens the OS PNG/JPG chooser.
 After selection, drag to position, use the slider or wheel to zoom 1–4×, and

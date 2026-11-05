@@ -818,3 +818,64 @@ Validation on Arch Linux with the pinned toolchain and two Cargo jobs:
 Native Windows execution and native Wayland app rendering remain unverified.
 Recommended follow-up is manual picture selection/dragging on both target
 platforms. No installation, commit, push, tag, or publication was performed.
+
+## Profile Picture Chooser 2× sizing — 2026-11-05
+
+Uniformly doubled the native profile editor from 200 × 230 to 400 × 460. The
+preview, crop ring, slider, buttons, close control, typography, spacing, corner
+radii, borders, hit targets, and error presentation all scale by the same 2×
+factor. Crop coordinates remain in the original design space; renderer geometry
+scales at draw time and pointer deltas convert back to crop-space units, so zoom,
+dragging, saved output, and keyboard behavior retain their existing semantics. A
+window shorter than 540px grows when the editor or a selection error becomes
+available, keeping the complete 460px card and retryable error visible without
+changing the normal 700 × 400 startup size.
+
+Validation on Arch Linux used the pinned toolchain and two Cargo jobs. Formatting,
+strict Clippy, the full automated test suite, debug build, and release build pass.
+The native X11 renderer capture at 700 × 540 confirms the complete doubled card,
+preview, crop ring, slider, and buttons are visible; the 1000 × 650 capture confirms
+the scaled modal remains centered in a larger window. Native Windows execution,
+Wayland rendering, and physical pointer interaction remain unverified.
+
+## Profile editor corrections and responsiveness — 2026-11-06
+
+The previous 2× change incorrectly relied on a parent Canvas transform inside a
+clipped image subframe. Render the image bounds and clip in actual display pixels
+so the preview agrees with the saved crop. Keep drag deltas in crop coordinates
+using the current preview scale. Renderer tests compare portrait/landscape preview
+pixels with saved crops at three zoom levels and two window sizes.
+
+Replace fixed 2× sizing and the automatic window enlargement with one responsive
+scale for the entire card. At 700 × 400 it is 320 × 368 with 16px exterior margins;
+larger windows grow it to 400 × 460. Buttons, type, slider, mask, and padding share
+the same scale. Selection/save errors have reserved, scrollable space. Synthetic
+native widget events verify the bottom of both action buttons remains clickable
+after resizing large → minimum → intermediate.
+
+The inert native backdrop now renders at half resolution, capped at 512px per
+axis, with the existing image dependency's optimized three-pass blur. An explicit
+renderer transform avoids tiny-skia's sub-1× screenshot damage-region clipping.
+During resizing the cached backdrop stretches immediately; a scheduled redraw
+refreshes it after 120ms of settled geometry. A renderer regression test checks
+full bottom-edge coverage, cache reuse, scheduled refresh, and cache replacement.
+Development builds optimize existing image/codec and tiny-skia dependencies;
+no new dependency, image limit, storage format, or release profile change.
+
+Measured on this Arch machine with an unoptimized application harness linked to
+the development dependencies (five reads of generated 1920 × 1080 fixtures):
+JPEG read/decode/handle preparation fell from 668ms to 13ms; PNG from 221ms to
+47ms. This excludes OS file-dialog interaction. Backdrop layout/render/blur at
+1000 × 650 previously took 1.84s on every resize. Reusing the backdrop during
+resize now costs about 0.3–1.2ms; the deferred refresh costs about 170–190ms in
+this debug harness. First backdrop creation at 700 × 400 fell from 921ms to
+177ms. These are local component timings, not end-to-end platform guarantees.
+
+Validation: formatting and diff whitespace checks, strict all-target Clippy,
+115 automated tests, and locked debug/release builds pass with two Cargo jobs.
+Native XWayland captures at 700 × 400, 1000 × 650, and back to 700 × 400 confirm
+the aligned preview, fully visible proportional controls, and complete blurred
+backdrop after resizing. Error, zoom/pan, save, and reload captures also completed.
+Physical OS-picker interaction, native Wayland, and native Windows execution
+were not reverified in this follow-up. Evidence remains under
+`target/picture-verification/`; no real profile data was changed.

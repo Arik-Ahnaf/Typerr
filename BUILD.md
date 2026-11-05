@@ -34,6 +34,11 @@ The binaries are `target/debug/typerr` and `target/release/typerr`.
 `target/` is disposable build output. Use `cargo fmt --all` only when you
 intend to format source.
 
+Development builds optimize the existing image, JPEG/PNG codec, and tiny-skia
+dependencies so picture loading and modal rendering stay responsive in `cargo
+run`. Application code retains normal debug settings. Release optimization is
+unchanged.
+
 ## Run and package
 
 ```sh

@@ -21,3 +21,20 @@ rfd = "=0.17.2"
 
 [build-dependencies]
 serde_json = "1.0"
+
+# Keep interactive image loading fast in `cargo run`, too. Application code
+# retains its normal debug settings; only the pixel processing is optimized.
+[profile.dev.package.image]
+opt-level = 2
+
+[profile.dev.package.zune-jpeg]
+opt-level = 2
+
+[profile.dev.package.png]
+opt-level = 2
+
+[profile.dev.package.tiny-skia]
+opt-level = 2
+
+[profile.dev.package.iced_tiny_skia]
+opt-level = 2
