@@ -672,3 +672,21 @@ are not physical-input evidence. The first updater-enabled build must be install
 manually. Unsigned packages still obey each machine's pacman policy. No commit,
 push, tag, or release publication was performed. See UPDATING.md for recovery and
 release-contract requirements; preserve these platform qualifications in delivery.
+
+## Score and Dashboard Figma spacing refresh — 2026-11-05
+
+Re-inspected live Figma frames `59:3` and `86:50`. Score now includes the
+centered `Tab` / `to start a new test` hint while retaining measured statistics,
+the native graph, account action, and Next/Retry controls. Dashboard cards moved
+to x=45/355, with the avatar/profile copy and both best-result groups following
+the refreshed five-pixel spacing. Added the visible 500px chart separator at
+y=275; the updated 610 × 100 pink rectangle remains placement guidance only.
+Each lifetime-summary column now uses its renderer-measured top heading as one
+fixed left anchor for both rows and their values. This keeps `Typing Time` aligned
+with `Race Finished` without moving the established top-row placement; the
+best-result columns remain centered.
+
+Validation in a clean checkout: formatting, strict locked all-target Clippy,
+all 99 tests (39 library, 48 application/widget, 10 storage, 2 layout), locked
+debug/release builds, and `git diff --check` pass with two Cargo jobs. This
+isolated verification did not repeat GUI or target-platform runtime checks.

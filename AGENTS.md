@@ -118,7 +118,7 @@ Only one bar is open at a time. Selection, outside click, Escape, accepted typin
 
 Figma frames `54:22` and `59:3` now place a shared 70 × 30 account button 50px from the right and 30px from the top. Display hardcoded `Eric` with bundled Google Sans Code SemiBoldItalic at 20px, an 8px corner radius, control background, and Comment text changing to foreground on hover/press. Clicking opens Dashboard (authorized 2026-11-04). Disable pointer actions during the fade while keeping the account visible with the shared brand.
 
-The typing control groups form a centered 170 × 30 row at y=30 (x=265 at 700px); amount menus retain their 170 × 30 size at y=65. Score metrics begin at x=50, the speed-axis title at x=125, tick labels at x=150, and the plot at x=170; retain room for the Errors axis at the right. Lower statistics begin at x=180/264/410. Preserve measured data, the four-row typing viewport, configured font sizing, and all existing completion/input policies.
+The typing control groups form a centered 170 × 30 row at y=30 (x=265 at 700px); amount menus retain their 170 × 30 size at y=65. Score metrics begin at x=50, the speed-axis title at x=125, tick labels at x=150, and the plot at x=170; retain room for the Errors axis at the right. Lower statistics begin at x=180/264/410. Score also shows the centered 50 × 25 `Tab` hint at (252, 37), followed by `to start a new test`; it is presentation only and uses the existing fresh-Tab behavior. Preserve measured data, the four-row typing viewport, configured font sizing, and all existing completion/input policies.
 
 
 ## Completed score history — 2026-11-03
@@ -150,8 +150,7 @@ and scale body text and profile artwork uniformly by the smaller ratio.
 Keep the avatar circular. Header branding stays at its original fixed size,
 50px from the left and 30px from the top, with a fixed 124 × 40 Home hit target.
 The greeting stays 20px at top=37/right=70. Neither header element scales.
-Do not cap Dashboard at 700 × 400 or add outer centering margins. The pink 620 × 100 area at (40, 275) is only chart placement;
-render a transparent native Canvas histogram from `All time wpm bar chart.png`.
+Do not cap Dashboard at 700 × 400 or add outer centering margins. The pink 610 × 100 area at (45, 287) is only chart placement; the centered 500 × 2 foreground rule at (100, 275) is visible chart chrome. The four cards begin at x=45/355. Use the renderer-measured top heading as the fixed left anchor for both headings and values in each lifetime-summary column; keep best-result columns centered. Render a transparent native Canvas histogram from `All time wpm bar chart.png`.
 Reuse the shared brand and compiled palette. Bundle the supplied profile circle
 SVG and existing Google Sans Code Italic/Medium/SemiBold/Light font faces with
 OFL coverage. Profile name Eric, title, joined date, and greeting are hardcoded.

@@ -111,6 +111,39 @@ fn label(frame: &mut Frame, value: &str, rect: Rectangle, size: f32, font: Font)
     );
 }
 
+fn left_label(frame: &mut Frame, value: &str, rect: Rectangle, size: f32, font: Font) {
+    scaled_text(
+        frame,
+        Text {
+            content: value.into(),
+            position: Point::new(rect.x, rect.y),
+            size: fitted_size(value, font, size, rect.width).into(),
+            font,
+            color: theme::CORRECT,
+            align_x: iced::alignment::Horizontal::Left.into(),
+            line_height: native_text::LineHeight::Relative(1.25),
+            ..Text::default()
+        },
+    );
+}
+
+fn centered_label_left(value: &str, rect: Rectangle, size: f32, font: Font) -> f32 {
+    type NativeParagraph = <Renderer as native_text::Renderer>::Paragraph;
+    let size = fitted_size(value, font, size, rect.width);
+    let paragraph = NativeParagraph::with_text(native_text::Text {
+        content: value,
+        bounds: Size::INFINITE,
+        size: size.into(),
+        line_height: native_text::LineHeight::Relative(1.25),
+        font,
+        align_x: native_text::Alignment::Left,
+        align_y: iced::alignment::Vertical::Top,
+        shaping: native_text::Shaping::Basic,
+        wrapping: native_text::Wrapping::None,
+    });
+    rect.center_x() - paragraph.min_width() / 2.
+}
+
 fn rotated(frame: &mut Frame, value: &str, position: Point, size: f32, font: Font) {
     let scale = Scale::new(frame.size());
     let position = scale.point(position);
@@ -135,6 +168,10 @@ struct DashboardCanvas<'a> {
 impl DashboardCanvas<'_> {
     fn chart(&self, frame: &mut Frame) {
         // The pink rectangle in the design is placement guidance only.
+        frame.stroke(
+            &Path::line(Point::new(100., 275.), Point::new(600., 275.)),
+            Stroke::default().with_color(theme::CORRECT).with_width(2.),
+        );
         let plot = Rectangle {
             x: 79.,
             y: 280.,
@@ -227,10 +264,10 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
         let mut frame = Frame::new(renderer, bounds.size());
         frame.scale_nonuniform(Scale::new(bounds.size()).vector());
         for (x, y, h) in [
-            (40., 75., 100.),
-            (360., 75., 100.),
-            (40., 185., 80.),
-            (360., 185., 80.),
+            (45., 75., 100.),
+            (355., 75., 100.),
+            (45., 185., 80.),
+            (355., 185., 80.),
         ] {
             frame.fill(
                 &Path::rounded_rectangle(Point::new(x, y), Size::new(300., h), 4.into()),
@@ -246,7 +283,7 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
                 &mut frame,
                 Text {
                     content: value.into(),
-                    position: Point::new(140., y),
+                    position: Point::new(145., y),
                     size: size.into(),
                     font,
                     color: theme::CORRECT,
@@ -277,28 +314,37 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
         .iter()
         .enumerate()
         {
-            let x = [380., 483., 552.][i % 3];
-            let width = [100., 67., 86.][i % 3];
+            let column = i % 3;
+            let x = [380., 483., 552.][column];
+            let width = [100., 67., 86.][column];
             let y = if i < 3 { 85. } else { 125. };
-            label(
+            let heading = Rectangle {
+                x,
+                y,
+                width,
+                height: 15.,
+            };
+            let column_heading = ["Race Finished", "Avg. Wpm", "Highest Wpm"][column];
+            let content_x = centered_label_left(column_heading, heading, 12., theme::FONT);
+            let content_width = x + width - content_x;
+            left_label(
                 &mut frame,
                 title,
                 Rectangle {
-                    x,
-                    y,
-                    width,
-                    height: 15.,
+                    x: content_x,
+                    width: content_width,
+                    ..heading
                 },
                 12.,
                 theme::FONT,
             );
-            label(
+            left_label(
                 &mut frame,
                 &values[i],
                 Rectangle {
-                    x,
+                    x: content_x,
                     y: y + 15.,
-                    width,
+                    width: content_width,
                     height: 20.,
                 },
                 16.,
@@ -307,12 +353,12 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
         }
         for (mode, title, offset, amounts) in [
             (TestMode::Time, "Time", 0., [15, 30, 60, 120]),
-            (TestMode::Words, "Word", 320., [10, 25, 50, 100]),
+            (TestMode::Words, "Word", 310., [10, 25, 50, 100]),
         ] {
             rotated(
                 &mut frame,
                 title,
-                Point::new(50. + offset, 242.),
+                Point::new(55. + offset, 242.),
                 14.,
                 theme::ITALIC_FONT,
             );
@@ -327,7 +373,7 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
                 } else {
                     amount.to_string()
                 };
-                let x = [92., 148., 199., 249.][i] + offset;
+                let x = [97., 153., 204., 254.][i] + offset;
                 for (value, y, size, font) in [
                     (heading, 197., 14., theme::ITALIC_FONT),
                     (
@@ -367,7 +413,7 @@ pub fn view(data: Option<&DashboardData>) -> Element<'_, Message> {
     responsive(move |size| {
         let scale = Scale::new(size);
         let content = scale.content();
-        let avatar_center = scale.point(Point::new(90., 125.));
+        let avatar_center = scale.point(Point::new(95., 125.));
         let avatar = svg(svg::Handle::from_memory(include_bytes!(
             "../../assets/icons/profile-placeholder.svg"
         )))
