@@ -22,6 +22,10 @@ pub const USER_FONT: Font = Font {
     style: iced::font::Style::Italic,
     ..FONT
 };
+pub const SAVE_FONT: Font = Font {
+    weight: iced::font::Weight::Bold,
+    ..FONT
+};
 pub const BRAND_FONT: Font = Font::with_name("Jomhuria");
 pub const LINE_HEIGHT: f32 = 20.0;
 pub const INSET: f32 = 20.0;

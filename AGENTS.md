@@ -4,7 +4,7 @@
 
 Typerr is a native Rust typing application inspired by Monkeytype. Responsive input, accurate text layout, and smooth caret movement take priority over feature count. Target platforms are Windows and Arch Linux. Develop through small, independently testable alpha versions.
 
-The current updater follow-up (`1.1.0`) contains Main Typing, Score, and Dashboard pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the foreground color; inactive icons use Comment. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; completed-test SQLite history and Dashboard read queries are authorized by the 2026-11-03 follow-up. The 2026-11-04 follow-up authorizes the native Dashboard with hardcoded profile data; the Name Setter follow-up authorizes saving the user name in settings.json. The 2026-11-05 Profile Picture Chooser follow-up authorizes selecting, cropping, and saving an avatar. Settings UI and remaining profile fields stay excluded. The startup updater follow-up authorizes GitHub release checks, accepted downloads/installations, and temporary updater state. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
+The current updater follow-up (`1.1.0`) contains Main Typing, Score, and Dashboard pages with Words and Time modes, each generating 500 words. Words is the startup mode, with a selectable target (default 50) independent of the 500-word buffer. Words finishes when the final character of the selected final word is entered (including punctuation, regardless of correctness). Input freezes and the page crossfades to Score over 300 ms. Clicking a different mode starts a fresh session; clicking the current mode does nothing. Tab restarts the current mode, including after completion. The selected mode icon and enabled punctuation/number icons use the foreground color; inactive icons use Comment. Punctuation and numbers are independent, default-off toggles that work together in either mode. Changing a toggle resets the session and timer while preserving the mode and the other toggle; selections survive Tab and mode changes for the current app run. Time mode replaces the blue word counter with a selectable countdown (default 30 seconds), starting on the first accepted printable input. It uses monotonic elapsed time, continues while unfocused, and finishes at expiry, freezing input and crossfading to Score. Expiry is checked before keyboard edits as well as on redraws; exhausting the entire buffer also finishes either mode. Score uses measured session statistics and graph samples as authorized on 2026-10-28; completed-test SQLite history and Dashboard read queries are authorized by the 2026-11-03 follow-up. The 2026-11-04 follow-up authorizes the native Dashboard with hardcoded profile data; the Name Setter follow-up authorizes saving the user name in settings.json. The 2026-11-05 Profile Picture Chooser follow-up authorizes selecting, cropping, and saving an avatar. The 2026-11-06 follow-up authorizes a native Settings page and explicit Save to settings.json; live application of its parameters and remaining profile fields stay excluded. The startup updater follow-up authorizes GitHub release checks, accepted downloads/installations, and temporary updater state. Score has Next (new random target) and Retry (identical target) controls; both and Tab return immediately to Typing, preserving mode/options and clearing input/timer/presentation state. Ignore pointer actions during the fade; unmodified non-repeated Tab may cancel it. Startup-only reading of `settings.json` is authorized for typing font size. Keep future pages easy to add by separating page state and view responsibilities; do not create empty pages or a generic routing framework.
 
 The UI must remain native. Do not add HTML, CSS, JavaScript, webviews, or embedded browsers.
 
@@ -251,3 +251,56 @@ and read/write failures preserve it; failures are visible and retryable. Do not
 modify the original image, settings JSON, or SQLite. `App::default` performs no
 filesystem access. Limit inputs to 20 MiB, 8192px per axis and 128 MiB decoder
 allocation; reduce working copies to 2048px per axis. Never package user avatars.
+
+
+## Native Settings UI — 2026-11-06
+
+Figma Settings `91:26` and `design_references/Settings Page.png` define the
+700 × 400 reference. Ctrl+, opens Settings from Typing, Score, or Dashboard;
+ignore held repeats, extra modifiers, unfocused input, completion fades, and
+blocking modals. Opening abandons an unfinished test without saving, closes
+amount menus, and stops its countdown. Clicking the fixed brand returns to a
+fresh test with remembered mode, amounts, and generation options. Ctrl+, while
+already on Settings preserves the current view. Tab/Shift+Tab traverses settings
+fields and must never restart the underlying typing session.
+
+Keep branding fixed at (50, 30). Scale body geometry by each window axis and
+fonts/control contents uniformly by the smaller ratio. At the reference size,
+search is (30, 80, 640, 40), categories are (30, 130, 90, 160), and the options
+viewport is (130, 130, 540, 250). Only the options panel scrolls. General, Caret,
+Theme, Sound category clicks clear search and scroll their section heading to
+the top; leave enough trailing space for Sound. Highlight the section at the
+viewport top. Case-insensitive search matches category names or row labels,
+keeps matching headings, and shows an empty-result message when appropriate.
+
+`src/ui/settings_page.rs` owns temporary form state and native layout. Font size
+starts at 16, accepts integer 8–48, and restores the last valid value on invalid
+commit. Font family offers Google Sans Code; caret offers Line/Block/Underline;
+theme offers Dracula; Sound offers Off/On. Edits remain drafts until Save. Load
+saved values on startup, preserving valid fractional font sizes from existing
+configuration until edited. Save does not change the running font/caret/theme/audio
+or SQLite. The existing font-size startup setting takes effect after restart;
+other saved parameters are currently UI-only. Keep `App::default` free of filesystem access. Reuse
+compiled fonts/colors/branding and bundle the Figma dropdown arrow. The narrow
+Settings combo-box adapter exposes Iced 0.14's existing input to focus operations;
+keep typing's synchronous PageHost event path and modal isolation intact.
+Settings is a safe page for existing updater offers.
+
+The Save follow-up uses Figma `159:12`: a 100 × 33 background-colored button at
+(560, 337), 8px corners, Google Sans Code Bold 20px. Keep it fixed within the scaled options
+panel; reserve the bottom 43px for Save and status, leaving a 207px scrolling
+viewport at reference size. Reuse the bundled Google Sans Code Bold font.
+Save all parameters as `font-size` (number), `font-family`, `caret-style`, `theme`
+(strings), and `sound` (boolean), preserving name and unrelated JSON keys.
+Reuse the profile configuration path and atomic replacement/fallback behavior;
+never overwrite malformed JSON, including an existing fallback. Show Saved only
+after a successful write; show retryable errors without leaving the page or
+losing drafts. No live preference application is authorized by this follow-up.
+
+The Settings search stays at y=80 as the window grows. Its scale is
+clamp(1 + (min(width/700, height/400) - 1) * 0.25, 1, 1.25), yielding 40–50px
+height and 16–20px text. Keep its width aligned with the body panels. Place the
+panels directly below it with a 10px gap scaled by that same search factor;
+expand the options panel to retain its original scaled bottom margin. Category
+scroll targets still use the body vertical scale, independently of viewport
+height. Save has a 10px scaled inset from the panel's right edge.

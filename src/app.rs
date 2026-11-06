@@ -22,11 +22,12 @@ enum Page {
     Transition { started: Instant, now: Instant },
     Score,
     Dashboard,
+    Settings,
 }
 impl Page {
     fn score_opacity(self) -> f32 {
         match self {
-            Self::Typing | Self::Dashboard => 0.0,
+            Self::Typing | Self::Dashboard | Self::Settings => 0.0,
             Self::Score => 1.0,
             Self::Transition { started, now } => {
                 let t = (now.saturating_duration_since(started).as_secs_f32()
@@ -68,6 +69,8 @@ pub struct App {
     page: Page,
     focused: bool,
     settings: crate::settings::Settings,
+    settings_page: crate::ui::settings_page::State,
+    settings_task: iced::Task<Message>,
 }
 
 struct MainTyping {
@@ -138,6 +141,8 @@ impl MainTyping {
 
 #[derive(Debug, Clone)]
 pub enum Message {
+    OpenSettings,
+    Settings(crate::ui::settings_page::Event),
     ChoosePicture,
     ZoomPicture(f32),
     PanPicture(iced::Vector),
@@ -194,6 +199,8 @@ impl Default for App {
             page: Page::Typing,
             focused: true,
             settings: crate::settings::Settings::default(),
+            settings_page: crate::ui::settings_page::State::default(),
+            settings_task: iced::Task::none(),
         }
     }
 }
@@ -203,8 +210,18 @@ impl App {
         settings: crate::settings::Settings,
         startup: typerr::update::install::Startup,
     ) -> Self {
+        let profile = crate::settings::Profile::load();
+        let settings_page = match profile.parameters() {
+            Ok(parameters) => crate::ui::settings_page::State::from_parameters(parameters),
+            Err(error) => {
+                let mut state = crate::ui::settings_page::State::default();
+                state.save_result = Some(Err(error));
+                state
+            }
+        };
         Self {
-            profile: Some(crate::settings::Profile::load()),
+            profile: Some(profile),
+            settings_page,
             picture: crate::profile_picture::Picture::load(
                 crate::settings::user_settings_path().map(|p| p.with_file_name("avatar.png")),
             ),
@@ -236,12 +253,12 @@ impl App {
             self.updater.shutdown();
             return iced::exit();
         }
-        iced::Task::none()
+        std::mem::replace(&mut self.settings_task, iced::Task::none())
     }
 
     fn advance(&mut self, now: Instant) {
         self.picture.poll();
-        let safe = matches!(self.page, Page::Score | Page::Dashboard)
+        let safe = matches!(self.page, Page::Score | Page::Dashboard | Page::Settings)
             || (self.page == Page::Typing && self.main.started.is_none());
         self.updater
             .poll(safe && !self.needs_name() && !self.picture.modal());
@@ -298,7 +315,7 @@ impl App {
 
     fn update_at(&mut self, message: Message, now: Instant) {
         self.handle_at(message, now);
-        let safe = matches!(self.page, Page::Score | Page::Dashboard)
+        let safe = matches!(self.page, Page::Score | Page::Dashboard | Page::Settings)
             || (self.page == Page::Typing && self.main.started.is_none());
         self.updater
             .poll(safe && !self.needs_name() && !self.picture.modal());
@@ -463,7 +480,41 @@ impl App {
             }
             return;
         }
+        if let Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Character(key),
+            modifiers,
+            repeat: false,
+            ..
+        })) = &message
+            && self.focused
+            && key.as_str() == ","
+            && *modifiers == keyboard::Modifiers::CTRL
+        {
+            self.handle_at(Message::OpenSettings, now);
+            return;
+        }
         match message {
+            Message::OpenSettings
+                if matches!(self.page, Page::Typing | Page::Score | Page::Dashboard) =>
+            {
+                self.main.amount_picker = None;
+                self.main.deadline = None;
+                self.dashboard_reply = None;
+                self.settings_task = self.settings_page.open();
+                self.page = Page::Settings;
+            }
+            Message::Settings(crate::ui::settings_page::Event::Save)
+                if self.page == Page::Settings =>
+            {
+                let parameters = self.settings_page.parameters();
+                self.settings_page.save_result = Some(match self.profile.as_mut() {
+                    Some(profile) => profile.save_parameters(&parameters),
+                    None => Err("Settings storage is unavailable.".into()),
+                });
+            }
+            Message::Settings(event) if self.page == Page::Settings => {
+                self.settings_task = self.settings_page.update(event);
+            }
             Message::ChoosePicture if self.page == Page::Dashboard => self.picture.choose(),
             Message::Dashboard if matches!(self.page, Page::Typing | Page::Score) => {
                 self.main.amount_picker = None;
@@ -471,7 +522,8 @@ impl App {
                 self.dashboard_reply = self.score_writer.as_ref().map(ScoreWriter::dashboard);
                 self.page = Page::Dashboard;
             }
-            Message::BackToTyping if self.page == Page::Dashboard => {
+            Message::BackToTyping if matches!(self.page, Page::Dashboard | Page::Settings) => {
+                self.settings_page.commit();
                 self.main.restart();
                 self.dashboard_reply = None;
                 self.page = Page::Typing;
@@ -529,6 +581,9 @@ impl App {
                 repeat,
                 ..
             })) if self.focused => {
+                if self.page == Page::Settings {
+                    return;
+                }
                 if modifiers.control() || modifiers.alt() || modifiers.logo() {
                     return;
                 }
@@ -646,6 +701,9 @@ impl App {
     }
 
     fn page_content(&self) -> Element<'_, Message> {
+        if self.page == Page::Settings {
+            return crate::ui::settings_page::view(&self.settings_page);
+        }
         if self.page == Page::Dashboard {
             return crate::ui::dashboard::view(
                 self.dashboard.as_ref(),
@@ -736,6 +794,12 @@ impl App {
             matches!(self.page, Page::Transition { .. }),
         )
         .text_input(self.needs_name())
+        .settings_input(
+            self.page == Page::Settings
+                && !self.needs_name()
+                && !self.updater.visible
+                && !self.picture.modal(),
+        )
         .into()
     }
 }
@@ -807,7 +871,184 @@ mod tests {
             page: Page::Typing,
             focused: true,
             settings: crate::settings::Settings::default(),
+            settings_page: crate::ui::settings_page::State::default(),
+            settings_task: iced::Task::none(),
         }
+    }
+
+    #[test]
+    fn native_settings_save_hit_target_persists_without_applying_and_reports_errors() {
+        use crate::ui::settings_page::Event as SettingsEvent;
+        use iced::advanced::{
+            Layout, Shell, clipboard, layout, mouse, renderer::Headless, widget::Tree,
+        };
+        let renderer = iced::futures::executor::block_on(iced::Renderer::new(
+            crate::ui::theme::FONT,
+            16.0.into(),
+            Some("tiny-skia"),
+        ))
+        .unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(&path, r#"{"name":"Alice","custom":123}"#).unwrap();
+        let mut app = App {
+            profile: Some(crate::settings::Profile::at(path.clone(), None)),
+            ..App::default()
+        };
+        app.update(Message::OpenSettings);
+        app.update(Message::Settings(SettingsEvent::FontSize("30".into())));
+        app.update(Message::Settings(SettingsEvent::Caret("Block".into())));
+        app.update(Message::Settings(SettingsEvent::Sound("On".into())));
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            r#"{"name":"Alice","custom":123}"#
+        );
+        for size in [iced::Size::new(700., 400.), iced::Size::new(1100., 650.)] {
+            let mut view = app.view();
+            let mut tree = Tree::new(&view);
+            let node = view.as_widget_mut().layout(
+                &mut tree,
+                &renderer,
+                &layout::Limits::new(iced::Size::ZERO, size),
+            );
+            let mut messages = Vec::new();
+            for event in [
+                mouse::Event::ButtonPressed(mouse::Button::Left),
+                mouse::Event::ButtonReleased(mouse::Button::Left),
+            ] {
+                view.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(event),
+                    Layout::new(&node),
+                    mouse::Cursor::Available(iced::Point::new(
+                        620. * size.width / 700.,
+                        353. * size.height / 400.,
+                    )),
+                    &renderer,
+                    &mut clipboard::Null,
+                    &mut Shell::new(&mut messages),
+                    &iced::Rectangle::with_size(size),
+                );
+            }
+            drop(view);
+            assert!(
+                messages
+                    .iter()
+                    .any(|m| matches!(m, Message::Settings(SettingsEvent::Save)))
+            );
+            for message in messages {
+                app.update(message);
+            }
+            assert!(matches!(app.settings_page.save_result, Some(Ok(()))));
+        }
+        let parameters = crate::settings::Profile::at(path.clone(), None)
+            .parameters()
+            .unwrap();
+        assert_eq!(parameters.font_size, 30.);
+        assert_eq!(parameters.caret_style, "Block");
+        assert!(parameters.sound);
+        assert_eq!(app.settings.font_size, 16.);
+        assert_eq!(app.page, Page::Settings);
+        let json: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(json["name"], "Alice");
+        assert_eq!(json["custom"], 123);
+        std::fs::write(&path, "{").unwrap();
+        app.update(Message::Settings(SettingsEvent::Save));
+        assert!(matches!(app.settings_page.save_result, Some(Err(_))));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{");
+        assert_eq!(app.settings_page.font_size, "30");
+        app.updater.visible = true;
+        app.settings_page.save_result = None;
+        app.update(Message::Settings(SettingsEvent::Save));
+        assert!(app.settings_page.save_result.is_none());
+    }
+
+    #[test]
+    fn settings_shortcut_guards_and_return_preserve_typing_options() {
+        use crate::ui::settings_page::Event as SettingsEvent;
+        let shortcut = || key(Key::Character(",".into()), Some(","), Modifiers::CTRL);
+        let mut app = app("abcd ");
+        app.update(Message::SelectMode(Mode::Time));
+        app.update(Message::ToggleNumbers);
+        app.update(key(
+            Key::Character("a".into()),
+            Some("a"),
+            Modifiers::empty(),
+        ));
+        assert!(app.main.deadline.is_some());
+        app.update(shortcut());
+        assert_eq!(app.page, Page::Settings);
+        assert!(app.main.deadline.is_none());
+        let position = app.main.session.position();
+        let generation = app.main.generation;
+        for event in [
+            key(Key::Named(Named::Tab), None, Modifiers::empty()),
+            key(Key::Named(Named::Backspace), None, Modifiers::empty()),
+            key(Key::Character("x".into()), Some("x"), Modifiers::empty()),
+        ] {
+            app.update(event);
+        }
+        assert_eq!(
+            (app.page, app.main.session.position(), app.main.generation),
+            (Page::Settings, position, generation)
+        );
+        app.update(Message::Settings(SettingsEvent::FontSize("32".into())));
+        app.update(Message::Settings(SettingsEvent::CommitFontSize));
+        app.update(Message::Settings(SettingsEvent::Search("caret".into())));
+        app.update(shortcut());
+        assert_eq!(app.settings_page.query, "caret");
+        assert_eq!(app.settings.font_size, 16.);
+        app.update(Message::BackToTyping);
+        assert_eq!(app.page, Page::Typing);
+        assert_eq!(app.main.session.position(), 0);
+        assert_eq!(app.main.mode, Mode::Time);
+        assert!(app.main.options.numbers);
+        assert_eq!(app.main.generation, generation + 1);
+        app.update(shortcut());
+        assert_eq!(app.settings_page.font_size, "32");
+        assert!(app.settings_page.query.is_empty());
+
+        for page in [Page::Typing, Page::Score, Page::Dashboard] {
+            app.page = page;
+            for modifiers in [
+                Modifiers::CTRL | Modifiers::SHIFT,
+                Modifiers::CTRL | Modifiers::ALT,
+                Modifiers::CTRL | Modifiers::LOGO,
+            ] {
+                app.update(key(Key::Character(",".into()), Some(","), modifiers));
+                assert_eq!(app.page, page);
+            }
+            let mut repeated = shortcut();
+            if let Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
+                repeat, ..
+            })) = &mut repeated
+            {
+                *repeat = true;
+            }
+            app.update(repeated);
+            assert_eq!(app.page, page);
+            app.focused = false;
+            app.update(shortcut());
+            assert_eq!(app.page, page);
+            app.focused = true;
+            app.update(shortcut());
+            assert_eq!(app.page, Page::Settings);
+        }
+        let now = Instant::now();
+        app.page = Page::Transition { started: now, now };
+        app.update_at(shortcut(), now);
+        assert!(matches!(app.page, Page::Transition { .. }));
+        app.page = Page::Dashboard;
+        app.picture.crop = Some(crate::profile_picture::Crop::new(
+            crate::profile_picture::placeholder(),
+        ));
+        app.update(shortcut());
+        assert_eq!(app.page, Page::Dashboard);
+        app.picture.crop = None;
+        app.updater.visible = true;
+        app.update(shortcut());
+        assert_eq!(app.page, Page::Dashboard);
     }
 
     #[test]
@@ -1398,6 +1639,8 @@ mod tests {
         }
         for message in [
             Message::Dashboard,
+            Message::OpenSettings,
+            key(Key::Character(",".into()), Some(","), Modifiers::CTRL),
             Message::SelectMode(Mode::Time),
             Message::ToggleNumbers,
             key(Key::Named(Named::Escape), None, Modifiers::empty()),

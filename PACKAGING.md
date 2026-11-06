@@ -174,3 +174,10 @@ the added Bold font is covered by the existing Google Sans Code OFL notice.
 Retain the locked image-codec and native-dialog dependency notices. Linux file
 selection uses the desktop's XDG portal/FileChooser backend, falling back to
 Zenity; these are optional runtime dependencies for picture selection.
+
+
+The Settings Save button reuses bundled Google Sans Code Bold and its existing
+OFL notice. Settings saves use the same
+atomic configuration writer and user-directory fallback as name onboarding.
+Only the existing font-size value currently affects behavior after restart;
+font-family, caret-style, theme, and sound are saved for the Settings UI.

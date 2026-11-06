@@ -13,6 +13,7 @@ pub struct PageHost<'a> {
     animating: bool,
     interactive: bool,
     text_input: bool,
+    settings_input: bool,
 }
 impl<'a> PageHost<'a> {
     pub fn new(
@@ -26,10 +27,15 @@ impl<'a> PageHost<'a> {
             animating,
             interactive: !animating,
             text_input: false,
+            settings_input: false,
         }
     }
     pub fn text_input(mut self, enabled: bool) -> Self {
         self.text_input = enabled;
+        self
+    }
+    pub fn settings_input(mut self, enabled: bool) -> Self {
+        self.settings_input = enabled;
         self
     }
     fn native(&self, event: &Event, shell: &mut Shell<'_, Message>) {
@@ -101,7 +107,7 @@ impl Widget<Message, Theme, Renderer> for PageHost<'_> {
     ) {
         // Children still see window events (caret focus/resize), but never keys.
         // Disable pointer actions during the fade, including hover tooltips.
-        if (self.text_input || !matches!(event, Event::Keyboard(_)))
+        if (self.text_input || self.settings_input || !matches!(event, Event::Keyboard(_)))
             && (self.interactive || matches!(event, Event::Window(_)))
         {
             self.content.as_widget_mut().update(
@@ -127,7 +133,32 @@ impl Widget<Message, Theme, Renderer> for PageHost<'_> {
             shell.publish(Message::FocusName);
             shell.capture_event();
         }
-        if !self.text_input || !matches!(event, Event::Keyboard(_)) {
+        if self.settings_input {
+            use super::settings_page::Event as SettingsEvent;
+            if let Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
+                modifiers,
+                repeat: false,
+                ..
+            }) = event
+                && !modifiers.control()
+                && !modifiers.alt()
+                && !modifiers.logo()
+            {
+                shell.publish(Message::Settings(SettingsEvent::Tab(modifiers.shift())));
+                shell.capture_event();
+            }
+            if matches!(
+                event,
+                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            ) {
+                shell.publish(Message::Settings(SettingsEvent::InspectFocus(false)));
+            }
+            if matches!(event, Event::Window(window::Event::Unfocused)) {
+                shell.publish(Message::Settings(SettingsEvent::CommitFontSize));
+            }
+        }
+        if !(self.text_input || self.settings_input) || !matches!(event, Event::Keyboard(_)) {
             self.native(event, shell);
         }
     }

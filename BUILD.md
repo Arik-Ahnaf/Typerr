@@ -144,3 +144,14 @@ PNG/JPG decoding uses the locked `image` codecs; `rfd` uses the Windows native
 file dialog or Linux desktop portal (with Zenity fallback). On Arch, enable your
 desktop's `xdg-desktop-portal` backend, or install `zenity` for the fallback.
 Avatar persistence uses the user settings directory described above.
+
+
+Press Ctrl+, from Typing, Score, or Dashboard to open Settings. Search filters
+its rows; categories jump within the scrollable options panel. Tab/Shift+Tab
+moves between fields, and dropdowns support arrow keys and Enter. Click the
+Typerr brand to start a fresh test. Click Save to atomically save all displayed
+parameters to the selected settings.json, preserving the name and unrelated keys.
+Saved values populate the form on the next launch; unsaved edits last only for
+the current run. Saving does not apply live changes. Font size takes effect on
+restart through the existing startup configuration; the other parameters remain
+UI-only. Save failures appear beside the button and can be retried.

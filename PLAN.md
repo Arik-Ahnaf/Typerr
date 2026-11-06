@@ -6,7 +6,7 @@ Current target: **2.0.0 release**, crate version `2.0.0`. Earlier alpha mileston
 
 Deliver native Rust/Iced Main Typing and Score pages with 500-word buffers, responsive input/layout, smooth 100 ms caret movement, and a 300 ms completion crossfade. The Score page uses measured WPM, accuracy, raw WPM, consistency, elapsed time, and a native Canvas graph; see the 2026-10-28 scoring follow-up.
 
-The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. The 2026-10-27 score follow-up supersedes the earlier no-navigation rules; Dashboard is authorized by the 2026-11-04 follow-up below; Settings remains excluded.
+The 2026-10-25 mode follow-up adds functional Words/Time buttons, 500-word sessions, and a 30-second countdown. The initial Alpha 0.1 milestones below are historical. The 2026-10-24 typing-page follow-up expands it to the current Figma frame, branding, inert controls, live word counter and footer links; see the follow-up record below. The 2026-10-27 score follow-up supersedes the earlier no-navigation rules; Dashboard is authorized by the 2026-11-04 follow-up below; the 2026-11-06 Settings follow-up authorizes native controls and explicit JSON saves without live preference application.
 
 ## Planning decisions
 
@@ -948,3 +948,80 @@ native Wayland, physical input, and the Windows installer UI remain unverified.
 `dist/SHA256SUMS` contains only these four version 2.0.0 artifacts. Build evidence
 is under `target/packaging/arch.8qr6BV/`, `target/packaging/windows.V1mYmi/`,
 and `target/packaging/windows-installer-last.nsi`.
+
+
+## Native Settings page and Save — 2026-11-06
+
+Implemented Figma Settings `91:26`, including the subsequent Save button
+`159:12`. Ctrl+, opens Settings from Typing/Score/Dashboard with modal, fade,
+repeat, modifier, and focus guards. The fixed brand returns to a fresh typing
+session; Settings input never edits/restarts an underlying test. Unfinished
+sessions are abandoned without saving and countdown scheduling stops.
+
+- Search and the four category links remain stationary. The options panel
+  supports wheel scrolling and a draggable scrollbar; category clicks clear
+  filters and align the selected heading at the top. Search matches categories
+  or row labels and shows a real empty-result state.
+- Body geometry scales with window axes, text with their smaller ratio; branding
+  stays fixed. Reused bundled fonts/colors/branding and the exact Figma chevron.
+  General/Caret reference positions are retained. Theme and Sound provide the
+  agreed minimal controls. A narrow native combo-box adapter exposes Iced's
+  existing text-input focus state for Tab/Shift+Tab traversal and keyboard menus.
+- The Save follow-up supersedes the initial session-only parameter plan. Save
+  remains visible at (570, 337), 100 × 33 at reference size, with bundled Inter
+  Bold and OFL coverage. Its fixed footer leaves a 207px options viewport inside
+  the original 250px panel. A scrollable status area shows success or errors.
+- Save writes numeric font-size, string font-family/caret-style/theme, and boolean
+  sound through the existing atomic profile writer. Re-read/merge at save time,
+  preserve name and unrelated keys, use the existing user-path fallback when
+  necessary, and refuse malformed original/fallback JSON. Failed saves preserve
+  drafts. Startup reloads supported saved parameters; unsupported individual
+  values use defaults. Existing valid fractional font sizes remain intact until
+  the user enters a new integer. App::default still performs no filesystem I/O.
+- Save leaves the current running test configuration unchanged. Only font-size
+  already has startup behavior; restart applies it. Other parameters remain
+  presentation-only. No new dependency, version bump, package build, push, or
+  release publication. Existing local settings.json edits were not changed.
+
+Validation:
+
+- All 124 automated tests passed, including navigation/input guards, search,
+  draft validation, geometry/focus reveal, native-widget Save hit targets at
+  700 × 400 and 1100 × 650, parameter roundtrip, preservation of unrelated keys,
+  malformed-file protection, invalid-parameter rejection, and writable fallback.
+- Formatting check, strict all-target Clippy, git diff --check, packaging-script
+  syntax checks, and final locked debug/release builds passed. Cargo checks used
+  CARGO_BUILD_JOBS=2. No packages were generated.
+- Before the Save follow-up, an isolated App::default native XWayland harness
+  at 125% scaling verified Ctrl+,, search/empty results, category jumps, keyboard
+  dropdown selection, wheel scrolling, scrollbar dragging, fixed branding,
+  700 × 400 / 1100 × 650 / 1200 × 400 / 700 × 700 layouts, and draft retention
+  after returning to typing and reopening Settings. Native screenshots are in
+  target/settings-verification. Additional native-input checks were stopped by
+  automatic approval review reporting a usage limit; they were not retried.
+- Final Save visuals, including success/error states and enlarged layout, were
+  inspected using Iced's headless software renderer with the compiled fonts.
+  Save pointer-to-JSON behavior was tested through native widget event dispatch
+  with temporary configuration files, not against the user's real settings.
+- Native Windows, native Wayland, physical keyboard/trackpad behavior, and a
+  separate OS-window click of the final Save button remain unverified. Future
+  work: apply saved parameters only when separately authorized.
+
+## Settings spacing refinement — 2026-11-06
+
+- Matched updated Figma Save `159:12`: moved x=570 to x=560 at reference
+  size and changed to the already bundled Google Sans Code Bold, 20px/25px.
+  The scaled right inset is now 10px. Removed the unused Inter asset, registration,
+  and packaging-notice additions introduced earlier in this work.
+- Kept search at y=80 beneath the fixed branding. Search now grows gently from
+  40px high / 16px text to a maximum 50px / 20px, while retaining body-aligned
+  width. Its gap to the panels uses the same limited scaling. Expanded the
+  options viewport into the recovered space while retaining the scaled bottom
+  margin and Save position. Scroll category tracking uses body scale directly,
+  rather than deriving it from the now independently sized viewport.
+- Inspected software-renderer screenshots at 700 × 400, 1100 × 650, and
+  1536 × 840 (`target/settings-verification/adjusted-*.png`). This verifies
+  rendered layout, not a new native OS-input or Windows/Wayland check.
+- Formatting, strict all-target Clippy, all 124 tests, locked debug/release
+  builds with CARGO_BUILD_JOBS=2, and git diff --check passed. Existing JSON
+  edits were preserved; no push or package publication.

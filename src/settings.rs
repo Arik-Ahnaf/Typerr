@@ -142,31 +142,118 @@ impl Profile {
     }
     pub fn save(&mut self, name: &str) -> Result<(), String> {
         let name = valid_name(name).ok_or("Enter a name of 1–16 characters.")?;
-        let mut value: serde_json::Value = match fs::read_to_string(&self.path) {
-            Ok(source) => {
-                serde_json::from_str(&source).map_err(|e| format!("Cannot read settings: {e}"))?
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::json!({}),
-            Err(e) => return Err(format!("Cannot read settings: {e}")),
+        self.save_patch(serde_json::json!({"name": name}))?;
+        self.name = Some(name);
+        Ok(())
+    }
+
+    pub fn parameters(&self) -> Result<Parameters, String> {
+        let object = read_object(&self.path)?;
+        let mut parameters = Parameters::default();
+        if let Some(size) = object.get("font-size").and_then(serde_json::Value::as_f64)
+            && (8.0..=48.0).contains(&size)
+        {
+            parameters.font_size = size as f32;
+        }
+        if let Some(value) = object
+            .get("font-family")
+            .and_then(serde_json::Value::as_str)
+            && value == "Google Sans Code"
+        {
+            parameters.font_family = value.into();
+        }
+        if let Some(value) = object
+            .get("caret-style")
+            .and_then(serde_json::Value::as_str)
+            && ["Line", "Block", "Underline"].contains(&value)
+        {
+            parameters.caret_style = value.into();
+        }
+        if let Some(value) = object.get("theme").and_then(serde_json::Value::as_str)
+            && value == "Dracula"
+        {
+            parameters.theme = value.into();
+        }
+        if let Some(value) = object.get("sound").and_then(serde_json::Value::as_bool) {
+            parameters.sound = value;
+        }
+        Ok(parameters)
+    }
+
+    pub fn save_parameters(&mut self, parameters: &Parameters) -> Result<(), String> {
+        if !(8.0..=48.0).contains(&parameters.font_size)
+            || parameters.font_family != "Google Sans Code"
+            || !["Line", "Block", "Underline"].contains(&parameters.caret_style.as_str())
+            || parameters.theme != "Dracula"
+        {
+            return Err("Invalid settings parameters.".into());
+        }
+        self.save_patch(serde_json::json!({
+            "font-size": parameters.font_size, "font-family": parameters.font_family,
+            "caret-style": parameters.caret_style, "theme": parameters.theme, "sound": parameters.sound,
+        }))
+    }
+
+    fn save_patch(&mut self, patch: serde_json::Value) -> Result<(), String> {
+        let patch = patch
+            .as_object()
+            .expect("internal settings patch is an object");
+        let mut object = read_object(&self.path)?;
+        object.extend(patch.clone());
+        let encode = |object: &serde_json::Map<String, serde_json::Value>| {
+            serde_json::to_vec_pretty(object).map_err(|e| e.to_string())
         };
-        value
-            .as_object_mut()
-            .ok_or("Settings must be a JSON object.")?
-            .insert("name".into(), name.clone().into());
-        let bytes = serde_json::to_vec_pretty(&value).map_err(|e| e.to_string())?;
-        if let Err(error) = write_settings(&self.path, &bytes) {
+        if let Err(error) = write_settings(&self.path, &encode(&object)?) {
             let fallback = self
                 .fallback
                 .as_ref()
                 .filter(|p| **p != self.path)
-                .ok_or_else(|| format!("Could not save name: {error}"))?;
-            write_settings(fallback, &bytes).map_err(|e| format!("Could not save name: {e}"))?;
+                .ok_or_else(|| format!("Could not save settings: {error}"))?;
+            // A fallback created since startup may contain newer unrelated keys.
+            // Parse it before replacing it, just as we do the original file.
+            object.extend(read_object(fallback)?);
+            object.extend(patch.clone());
+            write_settings(fallback, &encode(&object)?)
+                .map_err(|e| format!("Could not save settings: {e}"))?;
             self.path = fallback.clone();
         }
-        self.name = Some(name);
         Ok(())
     }
 }
+/// Persisted Settings-page values. Only font size is currently applied at startup.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Parameters {
+    pub font_size: f32,
+    pub font_family: String,
+    pub caret_style: String,
+    pub theme: String,
+    pub sound: bool,
+}
+impl Default for Parameters {
+    fn default() -> Self {
+        Self {
+            font_size: 16.,
+            font_family: "Google Sans Code".into(),
+            caret_style: "Line".into(),
+            theme: "Dracula".into(),
+            sound: false,
+        }
+    }
+}
+fn read_object(path: &Path) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let value: serde_json::Value = match fs::read_to_string(path) {
+        Ok(source) => {
+            serde_json::from_str(&source).map_err(|e| format!("Cannot read settings: {e}"))?
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => serde_json::json!({}),
+        Err(e) => return Err(format!("Cannot read settings: {e}")),
+    };
+    value
+        .as_object()
+        .cloned()
+        .ok_or_else(|| "Settings must be a JSON object.".into())
+}
+
 fn write_settings(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let parent = path
         .parent()
@@ -259,5 +346,139 @@ mod fallback_tests {
             24.
         );
         assert_eq!(fs::read_to_string(source).unwrap(), r#"{"font-size":24}"#);
+    }
+}
+
+#[cfg(test)]
+mod parameter_tests {
+    use super::*;
+    #[test]
+    fn save_and_reload_all_parameters_preserves_name_and_external_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(
+            &path,
+            r#"{"name":"Alice","font-size":24.5,"future":{"enabled":true}}"#,
+        )
+        .unwrap();
+        let mut profile = Profile::at(path.clone(), None);
+        assert_eq!(profile.parameters().unwrap().font_size, 24.5);
+        let parameters = Parameters {
+            font_size: 32.,
+            caret_style: "Underline".into(),
+            sound: true,
+            ..Parameters::default()
+        };
+        // Re-read at save time, rather than overwriting a stale startup snapshot.
+        fs::write(
+            &path,
+            r#"{"name":"Alice","future":{"enabled":false},"external":42}"#,
+        )
+        .unwrap();
+        profile.save_parameters(&parameters).unwrap();
+        assert_eq!(
+            Profile::at(path.clone(), None).parameters().unwrap(),
+            parameters
+        );
+        assert_eq!(
+            Settings::parse(&fs::read_to_string(&path).unwrap())
+                .unwrap()
+                .font_size,
+            32.
+        );
+        profile.save("Bob").unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+        assert_eq!(value["name"], "Bob");
+        assert_eq!(value["external"], 42);
+        assert_eq!(value["future"]["enabled"], false);
+        assert_eq!(value["sound"], true);
+        assert_eq!(profile.parameters().unwrap(), parameters);
+    }
+    #[test]
+    fn invalid_json_and_parameters_are_never_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        for source in ["{", "[]", "null"] {
+            fs::write(&path, source).unwrap();
+            let mut profile = Profile::at(path.clone(), None);
+            assert!(profile.parameters().is_err());
+            assert!(profile.save_parameters(&Parameters::default()).is_err());
+            assert_eq!(fs::read_to_string(&path).unwrap(), source);
+        }
+        fs::write(&path, "{}").unwrap();
+        let mut profile = Profile::at(path.clone(), None);
+        for size in [0., 49., f32::NAN, f32::INFINITY] {
+            assert!(
+                profile
+                    .save_parameters(&Parameters {
+                        font_size: size,
+                        ..Parameters::default()
+                    })
+                    .is_err()
+            );
+            assert_eq!(fs::read_to_string(&path).unwrap(), "{}");
+        }
+        assert!(
+            profile
+                .save_parameters(&Parameters {
+                    caret_style: "unknown".into(),
+                    ..Parameters::default()
+                })
+                .is_err()
+        );
+    }
+    #[test]
+    fn absent_and_unsupported_fields_have_independent_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let profile = Profile::at(path.clone(), None);
+        assert_eq!(profile.parameters().unwrap(), Parameters::default());
+        fs::write(path, r#"{"font-size":20,"font-family":"unknown","caret-style":"unknown","theme":"unknown","sound":true}"#).unwrap();
+        assert_eq!(
+            profile.parameters().unwrap(),
+            Parameters {
+                font_size: 20.,
+                sound: true,
+                ..Parameters::default()
+            }
+        );
+    }
+    #[cfg(unix)]
+    #[test]
+    fn parameter_fallback_preserves_keys_and_rejects_malformed_destination() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let install = dir.path().join("install");
+        fs::create_dir(&install).unwrap();
+        let source = install.join("settings.json");
+        let fallback = dir.path().join("user/settings.json");
+        fs::write(&source, r#"{"name":"Alice","keep":true}"#).unwrap();
+        fs::create_dir(fallback.parent().unwrap()).unwrap();
+        fs::write(&fallback, "{").unwrap();
+        let mut profile = Profile::at(source.clone(), Some(fallback.clone()));
+        fs::set_permissions(&install, fs::Permissions::from_mode(0o555)).unwrap();
+        let invalid = profile.save_parameters(&Parameters::default());
+        fs::set_permissions(&install, fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(invalid.is_err());
+        assert_eq!(fs::read_to_string(&fallback).unwrap(), "{");
+        fs::write(&fallback, r#"{"extra":7}"#).unwrap();
+        fs::set_permissions(&install, fs::Permissions::from_mode(0o555)).unwrap();
+        let result = profile.save_parameters(&Parameters {
+            sound: true,
+            ..Parameters::default()
+        });
+        fs::set_permissions(&install, fs::Permissions::from_mode(0o755)).unwrap();
+        result.unwrap();
+        let value: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(fallback).unwrap()).unwrap();
+        assert_eq!(value["name"], "Alice");
+        assert_eq!(value["keep"], true);
+        assert_eq!(value["extra"], 7);
+        assert_eq!(value["sound"], true);
+        assert_eq!(
+            fs::read_to_string(source).unwrap(),
+            r#"{"name":"Alice","keep":true}"#
+        );
     }
 }
