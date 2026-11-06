@@ -82,7 +82,7 @@ This checkout also has project-local tools under `target/windows-tools/`, which
 the script detects automatically; setup is unnecessary while those remain available.
 
 Outputs: `target/x86_64-pc-windows-msvc/release/typerr.exe` and
-`dist/typerr-1.1.0-windows-x86_64.zip`, plus updated `dist/SHA256SUMS`.
+`dist/typerr-2.0.0-windows-x86_64.zip`, plus updated `dist/SHA256SUMS`.
 The static-runtime flags apply only to the Windows target. No Wine or GitHub
 Actions is needed to build. Test the extracted application on Windows before
 claiming native Windows runtime support.
@@ -94,6 +94,10 @@ icon and multi-size Windows ICO require no image tools during ordinary builds.
 After changing the SVG, regenerate them with `bash packaging/generate-icons.sh`
 (requires `librsvg` and `imagemagick`). Windows builds also need `llvm-rc` from
 LLVM on `PATH`, or its path in `LLVM_RC`, to embed the executable icon.
+Run `bash packaging/build-windows-installer.sh` after the Windows ZIP build to
+create the per-user setup executable. The script accepts `MAKENSIS`; otherwise
+it detects native `makensis` or project-local Windows NSIS tools under
+`target/windows-tools/nsis/` and runs them with Wine.
 
 ## Troubleshooting
 

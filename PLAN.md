@@ -2,7 +2,7 @@
 
 ## Version and scope
 
-Current target: **Startup updater**, crate version `1.1.0`. Earlier alpha milestones below are historical.
+Current target: **2.0.0 release**, crate version `2.0.0`. Earlier alpha milestones below are historical.
 
 Deliver native Rust/Iced Main Typing and Score pages with 500-word buffers, responsive input/layout, smooth 100 ms caret movement, and a 300 ms completion crossfade. The Score page uses measured WPM, accuracy, raw WPM, consistency, elapsed time, and a native Canvas graph; see the 2026-10-28 scoring follow-up.
 
@@ -879,3 +879,72 @@ backdrop after resizing. Error, zoom/pan, save, and reload captures also complet
 Physical OS-picker interaction, native Wayland, and native Windows execution
 were not reverified in this follow-up. Evidence remains under
 `target/picture-verification/`; no real profile data was changed.
+
+## Fresh Arch and Windows packages — 2026-11-06
+
+Deleted every previous distribution artifact from `dist/`, then built current
+commit `7b989fe` as version 1.1.0 with Rust 1.98.1, locked dependencies, and two
+Cargo jobs. Formatting, strict native all-target Clippy, all 115 tests (39
+library, 64 application/widget/settings/image, 10 storage, 2 layout), native
+debug/release builds, Windows release all-target Clippy, and Windows MSVC release
+compilation passed.
+
+Fresh extraction verified executable and settings bytes, 24px packaged settings
+without the builder's saved name, executable permissions, pacman backup metadata,
+desktop entry/icon, font/Rust/word-list notices, and 334 Linux or 264 Windows
+dependency notice directories. No user avatar, score database, or diagnostic log
+is packaged. Native ELF linkage resolves and the Linux payloads report `Typerr
+1.1.0`. The Windows PE is x86-64 GUI with the expected static-runtime imports,
+1.1.0 file/product version resources, and all six embedded logo sizes. ZIP CRC,
+archive paths, package script syntax, and all checksums passed.
+
+| Local artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `dist/typerr-1.1.0-arch-linux-x86_64.tar.gz` | 12,286,834 | `54e6d942b70f3798c5bf48b5e943c071797b097382bc5318a9210d38e07aa428` |
+| `dist/typerr-1.1.0-1-x86_64.pkg.tar.zst` | 11,578,754 | `d406b75fba6734de81e6a1dd1123126572753928a91e03cda230f0337fc6624f` |
+| `dist/typerr-1.1.0-windows-x86_64.zip` | 9,690,724 | `0a8b1dab995d753d2d07ff3d337897af349d075987002ec4dfda2ceab439ca42` |
+
+`dist/SHA256SUMS` contains only these three fresh artifacts. Build evidence is
+under `target/packaging/arch.Ks6q3A/`, `target/packaging/windows.AoACPg/`, and
+`target/packaging/build-2026-11-06/`. This build-only run did not install or
+publish anything and did not repeat native GUI interaction checks. Native Windows
+execution, native Wayland rendering, and physical input remain unverified.
+
+## Version 2.0.0 release packages — 2026-11-06
+
+Aligned the crate, embedded executable resources, package metadata, archive
+names, and intended Git tag at version 2.0.0. Rebuilt the Arch portable archive,
+pacman package, and Windows portable ZIP from current commit `7b989fe` with Rust
+1.98.1, locked dependencies, and two Cargo jobs. Formatting, strict native and
+Windows release Clippy, all 115 tests, native debug/release builds, the Windows
+MSVC release cross-build, package metadata checks, and checksum verification
+passed. The extracted Linux executable reports `Typerr 2.0.0`; the extracted
+Windows executable is an x86-64 GUI PE with 2.0.0 version resources.
+
+Added a reproducible NSIS installer built from the verified Windows ZIP payload.
+It installs for the current user, creates Start Menu and desktop shortcuts,
+registers an uninstaller, and preserves adjacent settings on reinstall and
+uninstall. Archive inspection confirmed that its application executable exactly
+matches both the portable ZIP and the cross-build output. An isolated Wine check
+confirmed silent installation, payload contents, and settings preservation on
+reinstall. Wine could not execute the generated uninstaller because its isolated
+prefix lacked COMCTL32; the uninstall instructions were inspected, but native
+Windows install/uninstall and application runtime remain manual checks. The
+installer is unsigned.
+
+Fresh extraction of every artifact verified executable permissions, clean 24px
+settings without the builder's name, desktop/package metadata, pacman settings
+backup handling, font and dependency notices, word-list provenance, and absence
+of user avatar or score data. Native ELF linkage resolves. Native Windows GUI,
+native Wayland, physical input, and the Windows installer UI remain unverified.
+
+| Local artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `dist/typerr-2.0.0-arch-linux-x86_64.tar.gz` | 12,286,615 | `0b0b0f2a3309fae44728c04202870658efb02c4376ccd2137eaba07fc1a63422` |
+| `dist/typerr-2.0.0-1-x86_64.pkg.tar.zst` | 11,576,600 | `bd41f6626c6250bad888abb8d3129e17999135a9741ab5edf964a4bb0a28a41f` |
+| `dist/typerr-2.0.0-windows-x86_64.zip` | 9,691,597 | `36ce8682188ab0a3b2349d6a54a9222791f54a26299b84c85a887d347876098d` |
+| `dist/typerr-2.0.0-setup.exe` | 9,026,242 | `cf0ba9ef2c866d475fc4e59fb678b42829977af6b1509b675333740cb743c8b6` |
+
+`dist/SHA256SUMS` contains only these four version 2.0.0 artifacts. Build evidence
+is under `target/packaging/arch.8qr6BV/`, `target/packaging/windows.V1mYmi/`,
+and `target/packaging/windows-installer-last.nsi`.

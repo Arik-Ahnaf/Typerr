@@ -44,7 +44,7 @@ verified before files change, and backups remain until the new app starts.
 If an update is interrupted, start Typerr again to recover. Do not remove the
 `.typerr-update` folder while an update or recovery is running. Updater errors
 are logged to `updates-errors.log` beside the score database. The first version
-with this feature (1.1.0) must be installed manually.
+with this feature (2.0.0) must be installed manually.
 
 On first launch, enter a name (1–16 characters) and choose Save or press Enter.
 The name is saved as `name` in `settings.json` and used on the account button

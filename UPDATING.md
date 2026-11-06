@@ -1,9 +1,9 @@
 # Startup updates
 
-Typerr 1.1.0 checks `Arik-Ahnaf/Typerr`'s latest published stable GitHub release
+Typerr 2.0.0 checks `Arik-Ahnaf/Typerr`'s latest published stable GitHub release
 once each launch. It compares semantic versions, excluding prereleases and
-older/equal versions. The legacy v1.0.0 release packaged a 0.1.0 binary; 1.1.0
-corrects that mismatch. Install 1.1.0 manually first. No release is published
+older/equal versions. The legacy v1.0.0 release packaged a 0.1.0 binary; 2.0.0
+corrects that mismatch. Install 2.0.0 manually first. No release is published
 by building this feature.
 
 The 10-second background check never blocks typing. Offline, malformed, rate-

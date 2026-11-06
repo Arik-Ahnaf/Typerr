@@ -52,7 +52,7 @@ verified before files change, and backups remain until the new app starts.
 If an update is interrupted, start Typerr again to recover. Do not remove the
 `.typerr-update` folder while an update or recovery is running. Updater errors
 are logged to `updates-errors.log` beside the score database. The first version
-with this feature (1.1.0) must be installed manually.
+with this feature (2.0.0) must be installed manually.
 
 Pacman installations request administrator authentication through polkit and
 install the downloaded package using pacman. A graphical polkit authentication
