@@ -146,7 +146,7 @@ impl Updater {
                             self.visible = false;
                         }
                         Err(error) => {
-                            diagnostic(&format!("Startup update check: {error}"));
+                            log_diagnostic(&format!("Startup update check: {error}"));
                             self.phase = Phase::Dismissed;
                             self.visible = false;
                         }
@@ -313,6 +313,11 @@ fn prepare(
 }
 pub fn diagnostic(message: &str) {
     eprintln!("Typerr updater: {message}");
+    log_diagnostic(message);
+}
+fn log_diagnostic(message: &str) {
+    #[cfg(test)]
+    let _ = message;
     #[cfg(not(test))]
     use std::io::Write;
     #[cfg(not(test))]

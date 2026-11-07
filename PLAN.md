@@ -1050,6 +1050,24 @@ Validation:
   checks remain unverified. No packaging, push, or publication was performed.
   Live theme changes remain deferred; restart is required.
 
+
+## Startup HTTP 403 handling — 2026-11-07
+
+- Preserve HTTP status/headers instead of allowing ureq to discard rate-limit
+  metadata. Respect GitHub reset/retry deadlines for 403/429, with a one-hour
+  fallback and a 60-second minimum, persisted atomically beside the score DB.
+  Restarting during cooldown makes no check request; an expired or malformed
+  cooldown permits checking again. No credentials or dependencies added.
+- Background check failures go to the existing diagnostic file only; accepted
+  update/install/recovery errors retain their existing reporting. Release
+  selection, TLS restrictions, integrity checks, and typing behavior are unchanged.
+- Validation: formatting, strict locked two-job Clippy, all 129 tests, and debug/release
+  builds passed. Tests cover 403/429 headers, fallback, persisted cooldown/expiry,
+  malformed cache, offline/timeouts, and malformed metadata. Live GitHub API
+  returned HTTP 200 during investigation; the reported denial could not be
+  reproduced live. Native Windows runtime and GUI behavior were not re-tested
+  for this worker/logging change.
+
 ## Monkeytype VSCode theme — 2026-11-07
 
 - Added themes/vscode.json using the official vscode entry from Monkeytype's

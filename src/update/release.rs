@@ -8,7 +8,7 @@ use std::{
     io::{Read, Write},
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
-    time::Duration,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 pub const REPOSITORY: &str = "https://github.com/Arik-Ahnaf/Typerr";
@@ -127,6 +127,7 @@ fn agent(timeout: Duration) -> ureq::Agent {
         .timeout_global(Some(timeout))
         .timeout_connect(Some(Duration::from_secs(10)))
         .timeout_per_read(Some(Duration::from_secs(30)))
+        .http_status_as_error(false)
         .max_redirects(0)
         .build()
         .into()
@@ -178,24 +179,112 @@ fn request(url: &str, timeout: Duration) -> Result<ureq::http::Response<ureq::Bo
             continue;
         }
         if response.status() != 200 {
-            return Err(invalid(&format!("GitHub returned {}", response.status())));
+            return Err(
+                http_error(response.status().as_u16(), response.headers(), unix_time()).into(),
+            );
         }
         return Ok(response);
     }
     Err(invalid("Too many update redirects"))
 }
-pub fn check(distribution: Distribution) -> Result<Option<Release>> {
-    let mut response = request(API, Duration::from_secs(10))?;
-    let mut bytes = Vec::new();
-    response
-        .body_mut()
-        .as_reader()
-        .take(1024 * 1024 + 1)
-        .read_to_end(&mut bytes)?;
-    if bytes.len() > 1024 * 1024 {
-        return Err(invalid("Release metadata is too large"));
+#[derive(Debug)]
+struct HttpFailure {
+    status: u16,
+    retry_at: Option<u64>,
+}
+impl std::fmt::Display for HttpFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "GitHub returned HTTP {}", self.status)?;
+        if let Some(at) = self.retry_at {
+            write!(f, "; startup checks deferred until Unix time {at}")?;
+        }
+        Ok(())
+    }
+}
+impl std::error::Error for HttpFailure {}
+fn unix_time() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+fn http_error(status: u16, headers: &ureq::http::HeaderMap, now: u64) -> HttpFailure {
+    let number = |name| {
+        headers
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+    };
+    let retry_at = matches!(status, 403 | 429).then(|| {
+        let reset = number("x-ratelimit-reset").filter(|at| *at > now);
+        let retry = number("retry-after").map(|seconds| now.saturating_add(seconds));
+        reset
+            .into_iter()
+            .chain(retry)
+            .max()
+            .unwrap_or_else(|| now.saturating_add(3600))
+            .max(now.saturating_add(60))
+    });
+    HttpFailure { status, retry_at }
+}
+
+// This is worker-only state, independent of settings and installation journals.
+fn check_with(
+    distribution: Distribution,
+    cooldown: Option<&Path>,
+    now: u64,
+    fetch: impl FnOnce() -> Result<Vec<u8>>,
+) -> Result<Option<Release>> {
+    if cooldown
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|s| s.trim().parse::<u64>().ok())
+        .is_some_and(|at| at > now)
+    {
+        return Ok(None);
+    }
+    let bytes = match fetch() {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            if let Some(at) = error.downcast_ref::<HttpFailure>().and_then(|e| e.retry_at)
+                && let Some(path) = cooldown
+            {
+                // A failed cache write must not turn a background check into a UI failure.
+                let _ = (|| -> std::io::Result<()> {
+                    if let Some(parent) = path.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+                    let mut file =
+                        tempfile::NamedTempFile::new_in(path.parent().unwrap_or(Path::new(".")))?;
+                    write!(file, "{at}")?;
+                    file.persist(path).map_err(|e| e.error)?;
+                    Ok(())
+                })();
+            }
+            return Err(error);
+        }
+    };
+    if let Some(path) = cooldown {
+        let _ = std::fs::remove_file(path);
     }
     parse(&bytes, env!("CARGO_PKG_VERSION"), distribution)
+}
+pub fn check(distribution: Distribution) -> Result<Option<Release>> {
+    let cooldown = crate::storage::database_path()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join("update-check-retry-at")));
+    check_with(distribution, cooldown.as_deref(), unix_time(), || {
+        let mut response = request(API, Duration::from_secs(10))?;
+        let mut bytes = Vec::new();
+        response
+            .body_mut()
+            .as_reader()
+            .take(1024 * 1024 + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() > 1024 * 1024 {
+            return Err(invalid("Release metadata is too large"));
+        }
+        Ok(bytes)
+    })
 }
 pub fn download(
     asset: &Asset,
@@ -262,6 +351,76 @@ mod tests {
         let assets: Vec<_> = [format!("typerr-{version}-windows-x86_64.zip"), "SHA256SUMS".into()].into_iter().map(|name| serde_json::json!({"size":42,"state":"uploaded","browser_download_url":format!("{REPOSITORY}/releases/download/{tag}/{name}"),"name":name})).collect();
         serde_json::json!({"tag_name":tag,"draft":false,"prerelease":false,"assets":assets})
     }
+    #[test]
+    fn http_denials_preserve_retry_headers() {
+        let headers = ureq::http::Response::builder()
+            .header("x-ratelimit-reset", "5000")
+            .header("retry-after", "6000")
+            .body(())
+            .unwrap()
+            .into_parts()
+            .0
+            .headers;
+        for status in [403, 429] {
+            assert_eq!(http_error(status, &headers, 1000).retry_at, Some(7000));
+            assert_eq!(
+                http_error(status, &Default::default(), 1000).retry_at,
+                Some(4600)
+            );
+        }
+        assert_eq!(http_error(500, &headers, 1000).retry_at, None);
+        let headers = ureq::http::Response::builder()
+            .header("x-ratelimit-reset", "900")
+            .header("retry-after", "invalid")
+            .body(())
+            .unwrap()
+            .into_parts()
+            .0
+            .headers;
+        assert_eq!(http_error(403, &headers, 1000).retry_at, Some(4600));
+    }
+
+    #[test]
+    fn cooldown_survives_launches_and_expires() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("retry-at");
+        let check = |now, fetch| check_with(Distribution::Linux, Some(&path), now, fetch);
+        let denied: fn() -> Result<Vec<u8>> =
+            || Err(http_error(403, &Default::default(), 1000).into());
+        assert!(check(1000, denied).is_err());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "4600");
+        let unexpected: fn() -> Result<Vec<u8>> = || panic!("must not request during cooldown");
+        assert!(check(4599, unexpected).unwrap().is_none());
+        let success: fn() -> Result<Vec<u8>> =
+            || Ok(br#"{"draft":false,"prerelease":false,"tag_name":"v1.0.0"}"#.to_vec());
+        assert!(check(4600, success).unwrap().is_none());
+        assert!(!path.exists());
+        std::fs::write(&path, "broken").unwrap();
+        assert!(check(4700, success).unwrap().is_none());
+    }
+
+    #[test]
+    fn offline_and_metadata_errors_do_not_disable_future_checks() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("retry-at");
+        for message in ["offline", "timeout"] {
+            assert!(
+                check_with(Distribution::Linux, Some(&path), 1000, || Err(invalid(
+                    message
+                )))
+                .is_err()
+            );
+            assert!(!path.exists());
+        }
+        assert!(
+            check_with(Distribution::Linux, Some(&path), 1000, || Ok(
+                b"invalid JSON".to_vec()
+            ))
+            .is_err()
+        );
+        assert!(!path.exists());
+    }
+
     #[test]
     fn versions_and_channels() {
         for (remote, expected) in [

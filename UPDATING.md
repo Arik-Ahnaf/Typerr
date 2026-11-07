@@ -1,13 +1,20 @@
 # Startup updates
 
 Typerr 2.0.0 checks `Arik-Ahnaf/Typerr`'s latest published stable GitHub release
-once each launch. It compares semantic versions, excluding prereleases and
+at most once each launch. It compares semantic versions, excluding prereleases and
 older/equal versions. The legacy v1.0.0 release packaged a 0.1.0 binary; 2.0.0
 corrects that mismatch. Install 2.0.0 manually first. No release is published
 by building this feature.
 
 The 10-second background check never blocks typing. Offline, malformed, rate-
-limited, and missing-asset responses are logged without opening a dialog.
+limited, and missing-asset responses are logged without opening a dialog or
+printing to the shell. HTTP 403/429 responses defer subsequent launch checks
+until GitHub's `x-ratelimit-reset` or `Retry-After` deadline (whichever is later),
+with a one-hour fallback when neither provides a usable deadline. A minimum
+60-second cooldown prevents immediate retries. This worker-owned deadline is
+stored in `update-check-retry-at` beside `scores.db`, independently of settings;
+checks resume on the next launch after it expires. A denied check cannot
+determine whether an update exists. No GitHub token is required or stored.
 An available update waits until the test and fade finish, Dashboard opens, or
 Tab starts a fresh idle session. Later dismisses it for this launch. No preference
 or settings write is made. Tab/Shift+Tab switches dialog buttons, Enter/Space
@@ -86,7 +93,8 @@ but restart fails, restart Typerr manually; package rollback is a pacman operati
 
 ## Diagnostics and verification
 
-Errors go to stderr and `updates-errors.log` beside `scores.db`. Updater files
+Background check errors go only to `updates-errors.log` beside `scores.db`;
+installation/recovery errors also go to stderr. Updater files
 contain release metadata, package payloads, and installation paths, not typing
 history or target text. No GitHub token is required or stored.
 

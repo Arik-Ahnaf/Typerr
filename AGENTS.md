@@ -176,8 +176,8 @@ or profile values are fabricated. No new dependency or schema migration.
 Read `UPDATING.md` before changing update behavior. Version 1.1.0 aligns Cargo,
 visible version labels, package filenames, and future `v<version>` GitHub tags;
 the historical v1.0.0 release contains 0.1.0 packages and must never be offered
-as an upgrade. Networking is limited to a once-per-launch stable GitHub release
-check and downloads explicitly accepted through the native dialog. Check errors
+as an upgrade. Networking is limited to at most one stable GitHub release
+check per launch (respect persisted HTTP 403/429 cooldowns) and downloads explicitly accepted through the native dialog. Check errors
 are quiet; defer offers until Typing has not started, Score, or Dashboard.
 
 `src/update.rs` owns worker communication; `src/update/` owns bounded HTTPS,
