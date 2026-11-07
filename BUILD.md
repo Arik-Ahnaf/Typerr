@@ -153,5 +153,11 @@ Typerr brand to start a fresh test. Click Save to atomically save all displayed
 parameters to the selected settings.json, preserving the name and unrelated keys.
 Saved values populate the form on the next launch; unsaved edits last only for
 the current run. Saving does not apply live changes. Font size takes effect on
-restart through the existing startup configuration; the other parameters remain
+restart through the existing startup configuration; theme also takes effect on restart; font family, caret style, and sound remain
 UI-only. Save failures appear beside the button and can be retried.
+
+Select the bundled palette with `"theme": "Gruvbox"`, `"theme": "Dracula"`, or `"theme": "VSCode"`
+in settings.json, or choose it in Settings and Save. Restart to apply. Theme
+names are case-insensitive; absent or unsupported values use Dracula. All
+palettes are embedded, so switching does not require a rebuild or theme files.
+Editing palette JSON colors requires rebuilding. See [themes/README.md](themes/README.md).

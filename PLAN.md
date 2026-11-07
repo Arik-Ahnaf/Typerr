@@ -1025,3 +1025,55 @@ Validation:
 - Formatting, strict all-target Clippy, all 124 tests, locked debug/release
   builds with CARGO_BUILD_JOBS=2, and git diff --check passed. Existing JSON
   edits were preserved; no push or package publication.
+
+## Gruvbox theme selection — 2026-11-07
+
+- Looked up the original morhetz/gruvbox palette and added the dark,
+  medium-contrast variant in themes/gruvbox.json with the exact Dracula JSON
+  key scheme and role mappings. Source and aqua/pink mappings are documented
+  in themes/README.md. Dracula's source colors remain unchanged.
+- build.rs validates and embeds both palettes. Startup settings select an
+  immutable native palette before UI creation; pages, graphs, SVG tints,
+  modal backdrops, and the footer name read it. No runtime theme-file access,
+  dependencies, or changes to engine/layout/input behavior were introduced.
+- Added theme selection to startup parsing and the existing Settings Save
+  flow. Names are case-insensitive; absent/unknown/non-string values use
+  Dracula. Saved selections apply after restart. Set the checkout's theme
+  to Gruvbox while preserving its existing 24px font and user name.
+- Validation: formatting, strict all-target Clippy, all 126 tests, locked
+  debug/release builds with CARGO_BUILD_JOBS=2, and git diff --check passed.
+  Coverage includes theme parsing/fallback, Gruvbox persistence with unrelated
+  keys preserved, and compiled palette role mappings for both themes.
+- Inspected Iced software-renderer Typing/Settings captures for both palettes
+  under target/gruvbox-verification. This confirms rendered colors and footer
+  selection, not native OS-window interaction. Native Windows and Wayland
+  checks remain unverified. No packaging, push, or publication was performed.
+  Live theme changes remain deferred; restart is required.
+
+## Monkeytype VSCode theme — 2026-11-07
+
+- Added themes/vscode.json using the official vscode entry from Monkeytype's
+  frontend/src/ts/constants/themes.ts. Retained the existing JSON key scheme;
+  documented source roles and aliases for unused palette keys in themes/README.md.
+- Embedded the palette and added VSCode to startup parsing and the Settings
+  dropdown. Select with "theme": "VSCode" (case-insensitive), then restart.
+  Existing settings and the current Gruvbox selection are preserved.
+- Formatting, strict all-target Clippy, all 129 tests, locked debug/release
+  builds with CARGO_BUILD_JOBS=2, and git diff --check passed. Existing palette
+  mapping coverage now includes VSCode. Inspected software-rendered Typing and
+  Settings screenshots in target/gruvbox-verification/VSCode-*.png; these verify
+  palette rendering, not native Windows/Wayland or OS-window interaction.
+- No new dependencies, packaging, push, or publication. Restart remains required.
+
+## Match Monkeytype Gruvbox — 2026-11-07
+
+- Replaced rendered Gruvbox roles with Monkeytype's official gruvbox_dark
+  palette: gold main accent #D79921, yellow caret #FABD2F, muted text #665C54,
+  and control background #212121. Background, foreground, and errors already
+  matched. Preserved theme name, JSON keys, role mappings, and active selection.
+  This supersedes the original medium-contrast mapping above.
+- Compared every rendered role against the fetched official theme constants.
+  Formatting, strict all-target Clippy, all 129 tests, locked debug/release
+  builds with two Cargo jobs, and git diff --check passed. Inspected the updated
+  software-rendered Typing screenshot under target/gruvbox-verification.
+  Native OS interaction, Windows, and Wayland were not re-tested.

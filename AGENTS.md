@@ -304,3 +304,19 @@ panels directly below it with a 10px gap scaled by that same search factor;
 expand the options panel to retain its original scaled bottom margin. Category
 scroll targets still use the body vertical scale, independently of viewport
 height. Save has a 10px scaled inset from the panel's right edge.
+
+## Gruvbox theme — 2026-11-07
+
+The theme follow-up authorizes startup selection of Dracula or Gruvbox through
+settings.json and the existing Settings dropdown/Save flow. Save remains deferred
+until restart. Both JSON palettes share Dracula's keys and role mappings and are
+validated/embedded by build.rs. Gruvbox uses Monkeytype's gruvbox_dark palette;
+see themes/README.md for source and mappings. The selected immutable palette is
+initialized before UI creation and supplies all page colors, SVG tints, graphs,
+modal backdrops, and the footer name. Unknown/missing theme values use Dracula.
+This supersedes earlier statements that theme is UI-only or Dracula-only.
+
+The VSCode follow-up also authorizes Monkeytype's VSCode palette using the
+same JSON schema, startup selection, and Settings Save/restart behavior.
+The current selection is preserved when adding a theme. See themes/README.md
+for the official source and role mapping.

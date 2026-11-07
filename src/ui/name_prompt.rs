@@ -16,12 +16,12 @@ pub fn view<'a>(name: &'a str, error: Option<&'a str>) -> Element<'a, Message> {
         .padding([7, 10])
         .width(200)
         .style(|_, _| text_input::Style {
-            background: theme::CONTROL_BACKGROUND.into(),
+            background: theme::palette().control_background.into(),
             border: Border::default().rounded(8),
-            icon: theme::PENDING,
-            placeholder: theme::PENDING,
-            value: theme::CORRECT,
-            selection: theme::PENDING,
+            icon: theme::palette().pending,
+            placeholder: theme::palette().pending,
+            value: theme::palette().correct,
+            selection: theme::palette().pending,
         });
     let save = button(
         text("Save")
@@ -34,11 +34,11 @@ pub fn view<'a>(name: &'a str, error: Option<&'a str>) -> Element<'a, Message> {
     .padding([2, 15])
     .on_press_maybe(valid_name(name).map(|_| Message::SaveName))
     .style(|_, status| button::Style {
-        background: Some(theme::PENDING.into()),
+        background: Some(theme::palette().pending.into()),
         text_color: if status == button::Status::Hovered {
             Color::WHITE
         } else {
-            theme::CORRECT
+            theme::palette().correct
         },
         border: Border::default().rounded(8),
         ..Default::default()
@@ -49,7 +49,7 @@ pub fn view<'a>(name: &'a str, error: Option<&'a str>) -> Element<'a, Message> {
                 .font(theme::SEMIBOLD_FONT)
                 .size(16)
                 .line_height(1.25)
-                .color(theme::CORRECT),
+                .color(theme::palette().correct),
             Space::new().height(15),
             input,
             Space::new().height(20),
@@ -62,14 +62,14 @@ pub fn view<'a>(name: &'a str, error: Option<&'a str>) -> Element<'a, Message> {
     .height(150)
     .align_x(iced::Center)
     .style(|_| container::Style {
-        background: Some(theme::BACKGROUND.into()),
+        background: Some(theme::palette().background.into()),
         border: Border::default().rounded(8),
         ..Default::default()
     });
     let mut contents = column![card].align_x(iced::Center).spacing(12);
     if let Some(error) = error {
-        contents =
-            contents.push(container(text(error).size(12).color(theme::INCORRECT)).max_width(460));
+        contents = contents
+            .push(container(text(error).size(12).color(theme::palette().incorrect)).max_width(460));
     }
     container(contents)
         .center_x(Fill)

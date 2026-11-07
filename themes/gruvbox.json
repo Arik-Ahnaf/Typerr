@@ -1,0 +1,30 @@
+{
+  "name": "Gruvbox",
+  "colors": {
+    "background": "#282828",
+    "current_line": "#212121",
+    "selection": "#212121",
+    "foreground": "#EBDBB2",
+    "comment": "#665C54",
+    "red": "#FB4934",
+    "orange": "#D79921",
+    "yellow": "#FABD2F",
+    "green": "#B8BB26",
+    "cyan": "#FABD2F",
+    "purple": "#D3869B",
+    "pink": "#D3869B"
+  },
+  "accents": {
+    "blue": "#D79921"
+  },
+  "roles": {
+    "BACKGROUND": "background",
+    "CONTROL_BACKGROUND": "selection",
+    "CORRECT": "foreground",
+    "PENDING": "comment",
+    "INCORRECT": "red",
+    "CYAN": "cyan",
+    "BLUE": "blue",
+    "ORANGE": "orange"
+  }
+}

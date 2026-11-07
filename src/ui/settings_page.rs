@@ -99,7 +99,7 @@ impl Default for State {
             active: Some(Category::General),
             families: choices(&["Google Sans Code"]),
             carets: choices(&["Line", "Block", "Underline"]),
-            themes: choices(&["Dracula"]),
+            themes: choices(&crate::settings::Theme::NAMES),
             sounds: choices(&["Off", "On"]),
         }
     }
@@ -306,7 +306,7 @@ impl Scale {
 }
 fn panel_style(_: &iced::Theme) -> container::Style {
     container::Style {
-        background: Some(theme::CONTROL_BACKGROUND.into()),
+        background: Some(theme::palette().control_background.into()),
         border: Border::default().rounded(4),
         ..Default::default()
     }
@@ -319,7 +319,7 @@ fn input_style(
     text_input::Style {
         background: background.into(),
         border: Border {
-            color: theme::PENDING,
+            color: theme::palette().pending,
             width: if matches!(status, text_input::Status::Focused { .. }) {
                 1.
             } else {
@@ -327,10 +327,10 @@ fn input_style(
             },
             radius: radius.into(),
         },
-        icon: theme::CORRECT,
-        placeholder: theme::CORRECT,
-        value: theme::CORRECT,
-        selection: theme::PENDING,
+        icon: theme::palette().correct,
+        placeholder: theme::palette().correct,
+        value: theme::palette().correct,
+        selection: theme::palette().pending,
     }
 }
 fn text_width(value: &str, size: f32) -> f32 {
@@ -370,13 +370,13 @@ fn choice<'a>(
         left,
         right: 15. * scale.text,
     })
-    .input_style(move |_, status| input_style(theme::BACKGROUND, 8. * scale.text, status))
+    .input_style(move |_, status| input_style(theme::palette().background, 8. * scale.text, status))
     .menu_style(|_| iced::widget::overlay::menu::Style {
-        background: theme::BACKGROUND.into(),
+        background: theme::palette().background.into(),
         border: Border::default().rounded(4),
-        text_color: theme::CORRECT,
-        selected_text_color: theme::CORRECT,
-        selected_background: theme::PENDING.into(),
+        text_color: theme::palette().correct,
+        selected_text_color: theme::palette().correct,
+        selected_background: theme::palette().pending.into(),
         shadow: Default::default(),
     });
     let arrow = container(
@@ -408,7 +408,7 @@ fn section<'a>(
         container(Space::new().height(3. * scale.text))
             .width(Fill)
             .style(|_| container::Style {
-                background: Some(theme::CORRECT.into()),
+                background: Some(theme::palette().correct.into()),
                 border: Border::default().rounded(8),
                 ..Default::default()
             }),
@@ -431,7 +431,9 @@ fn section<'a>(
                 .align_x(iced::alignment::Horizontal::Center)
                 .padding([2. * scale.text, 5. * scale.text])
                 .width(161. * scale.x)
-                .style(move |_, status| input_style(theme::BACKGROUND, 8. * scale.text, status))
+                .style(move |_, status| {
+                    input_style(theme::palette().background, 8. * scale.text, status)
+                })
                 .into(),
             (Category::General, _) => {
                 choice(&state.families, &state.family, Event::FontFamily, scale)
@@ -490,7 +492,11 @@ pub fn view(state: &State) -> Element<'_, Message> {
             })
             .width(640. * scale.x)
             .style(move |_, status| {
-                input_style(theme::CONTROL_BACKGROUND, 8. * search_scale, status)
+                input_style(
+                    theme::palette().control_background,
+                    8. * search_scale,
+                    status,
+                )
             });
         let categories = container(column(Category::ALL.into_iter().map(|category| {
             button(
@@ -509,9 +515,9 @@ pub fn view(state: &State) -> Element<'_, Message> {
                 text_color: if state.active == Some(category)
                     || matches!(status, button::Status::Hovered | button::Status::Pressed)
                 {
-                    theme::CORRECT
+                    theme::palette().correct
                 } else {
-                    theme::PENDING
+                    theme::palette().pending
                 },
                 ..Default::default()
             })
@@ -548,7 +554,7 @@ pub fn view(state: &State) -> Element<'_, Message> {
                 let mut style = scrollable::default(theme, status);
                 style.container = panel_style(theme);
                 style.vertical_rail.background = None;
-                style.vertical_rail.scroller.background = super::theme::PENDING.into();
+                style.vertical_rail.scroller.background = super::theme::palette().pending.into();
                 style.vertical_rail.scroller.border = Border::default().rounded(4);
                 style
             });
@@ -565,10 +571,10 @@ pub fn view(state: &State) -> Element<'_, Message> {
         .padding(0)
         .on_press(message(Event::Save))
         .style(move |_, status| button::Style {
-            background: Some(theme::BACKGROUND.into()),
-            text_color: theme::CORRECT,
+            background: Some(theme::palette().background.into()),
+            text_color: theme::palette().correct,
             border: Border {
-                color: theme::PENDING,
+                color: theme::palette().pending,
                 width: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
                     1.
                 } else {
@@ -586,9 +592,9 @@ pub fn view(state: &State) -> Element<'_, Message> {
                 };
                 scrollable(text(label).font(theme::FONT).size(11. * scale.text).color(
                     if result.is_ok() {
-                        theme::CORRECT
+                        theme::palette().correct
                     } else {
-                        theme::INCORRECT
+                        theme::palette().incorrect
                     },
                 ))
                 .width(410. * scale.x)

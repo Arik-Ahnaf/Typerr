@@ -141,7 +141,7 @@ impl Widget<Message, Theme, Renderer> for Blur<'_> {
                     viewport,
                 );
             });
-            let pixels = offscreen.screenshot(size, 1., super::theme::BACKGROUND);
+            let pixels = offscreen.screenshot(size, 1., super::theme::palette().background);
             let pixels = blur(pixels, size.width, size.height);
             *cached = Some(image::Handle::from_rgba(size.width, size.height, pixels));
             state.refresh_at.set(None);

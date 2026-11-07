@@ -1,0 +1,30 @@
+{
+  "name": "VSCode",
+  "colors": {
+    "background": "#1E1E1E",
+    "current_line": "#191919",
+    "selection": "#191919",
+    "foreground": "#D4D4D4",
+    "comment": "#4D4D4D",
+    "red": "#F44747",
+    "orange": "#007ACC",
+    "yellow": "#D4D4D4",
+    "green": "#D4D4D4",
+    "cyan": "#569CD6",
+    "purple": "#007ACC",
+    "pink": "#007ACC"
+  },
+  "accents": {
+    "blue": "#007ACC"
+  },
+  "roles": {
+    "BACKGROUND": "background",
+    "CONTROL_BACKGROUND": "selection",
+    "CORRECT": "foreground",
+    "PENDING": "comment",
+    "INCORRECT": "red",
+    "CYAN": "cyan",
+    "BLUE": "blue",
+    "ORANGE": "orange"
+  }
+}

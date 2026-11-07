@@ -87,7 +87,7 @@ fn label(frame: &mut Frame, value: &str, rect: Rectangle, size: f32, font: Font)
             position: Point::new(rect.center_x(), rect.y),
             size: fitted_size(value, font, size, rect.width).into(),
             font,
-            color: theme::CORRECT,
+            color: theme::palette().correct,
             align_x: iced::alignment::Horizontal::Center.into(),
             line_height: native_text::LineHeight::Relative(1.25),
             ..Text::default()
@@ -103,7 +103,7 @@ fn left_label(frame: &mut Frame, value: &str, rect: Rectangle, size: f32, font: 
             position: Point::new(rect.x, rect.y),
             size: fitted_size(value, font, size, rect.width).into(),
             font,
-            color: theme::CORRECT,
+            color: theme::palette().correct,
             align_x: iced::alignment::Horizontal::Left.into(),
             line_height: native_text::LineHeight::Relative(1.25),
             ..Text::default()
@@ -139,7 +139,7 @@ fn rotated(frame: &mut Frame, value: &str, position: Point, size: f32, font: Fon
             content: value.into(),
             size: (size * scale.content()).into(),
             font,
-            color: theme::CORRECT,
+            color: theme::palette().correct,
             ..Text::default()
         }
         .draw_with(|path, color| frame.fill(&path, color));
@@ -155,7 +155,9 @@ impl DashboardCanvas<'_> {
         // The pink rectangle in the design is placement guidance only.
         frame.stroke(
             &Path::line(Point::new(100., 275.), Point::new(600., 275.)),
-            Stroke::default().with_color(theme::CORRECT).with_width(2.),
+            Stroke::default()
+                .with_color(theme::palette().correct)
+                .with_width(2.),
         );
         let plot = Rectangle {
             x: 79.,
@@ -173,7 +175,7 @@ impl DashboardCanvas<'_> {
             frame.stroke(
                 &Path::line(Point::new(plot.x, y), Point::new(plot.x + plot.width, y)),
                 Stroke::default()
-                    .with_color(theme::GRAPH_GRID)
+                    .with_color(theme::palette().control_background)
                     .with_width(0.5),
             );
             if data.is_some() {
@@ -200,7 +202,7 @@ impl DashboardCanvas<'_> {
                     frame.fill_rectangle(
                         Point::new(x + cell * 0.14, plot.y + plot.height - h),
                         Size::new(cell * 0.72, h),
-                        theme::BLUE,
+                        theme::palette().blue,
                     );
                 }
                 let low = i as f64 * data.bin_width;
@@ -256,7 +258,7 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
         ] {
             frame.fill(
                 &Path::rounded_rectangle(Point::new(x, y), Size::new(300., h), 4.into()),
-                theme::CONTROL_BACKGROUND,
+                theme::palette().control_background,
             );
         }
         for (value, y, size, font) in [
@@ -276,7 +278,7 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
                     position: Point::new(145., y),
                     size: size.into(),
                     font,
-                    color: theme::CORRECT,
+                    color: theme::palette().correct,
                     ..Text::default()
                 },
             );
@@ -421,7 +423,7 @@ pub fn view<'a>(
                 .font(theme::USER_FONT)
                 .size(greeting_size)
                 .line_height(1.25)
-                .color(theme::ORANGE),
+                .color(theme::palette().orange),
         )
         .width(iced::Fill)
         .align_x(iced::Right)

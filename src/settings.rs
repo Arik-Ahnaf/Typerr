@@ -5,14 +5,47 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Theme {
+    #[default]
+    Dracula,
+    Gruvbox,
+    VSCode,
+}
+impl Theme {
+    pub const NAMES: [&str; 3] = ["Dracula", "Gruvbox", "VSCode"];
+    pub fn parse(value: &str) -> Option<Self> {
+        if value.eq_ignore_ascii_case("dracula") {
+            Some(Self::Dracula)
+        } else if value.eq_ignore_ascii_case("gruvbox") {
+            Some(Self::Gruvbox)
+        } else if value.eq_ignore_ascii_case("vscode") {
+            Some(Self::VSCode)
+        } else {
+            None
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Dracula => "Dracula",
+            Self::Gruvbox => "Gruvbox",
+            Self::VSCode => "VSCode",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Settings {
     pub font_size: f32,
+    pub theme: Theme,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { font_size: 16.0 }
+        Self {
+            font_size: 16.0,
+            theme: Theme::default(),
+        }
     }
 }
 
@@ -42,15 +75,21 @@ impl Settings {
     fn parse(source: &str) -> Result<Self, String> {
         let value: serde_json::Value = serde_json::from_str(source).map_err(|e| e.to_string())?;
         let object = value.as_object().ok_or("expected a JSON object")?;
-        let Some(value) = object.get("font-size") else {
-            return Ok(Self::default());
+        let theme = object
+            .get("theme")
+            .and_then(serde_json::Value::as_str)
+            .and_then(Theme::parse)
+            .unwrap_or_default();
+        let font_size = match object.get("font-size") {
+            Some(value) => value.as_f64().ok_or("font-size must be a number")?,
+            None => 16.0,
         };
-        let font_size = value.as_f64().ok_or("font-size must be a number")?;
         if !(8.0..=48.0).contains(&font_size) {
             return Err("font-size must be between 8 and 48 logical pixels".into());
         }
         Ok(Self {
             font_size: font_size as f32,
+            theme,
         })
     }
 
@@ -69,6 +108,21 @@ mod tests {
         let settings = Settings::parse(r#"{"font-size": 24.5}"#).unwrap();
         assert_eq!(settings.font_size, 24.5);
         assert_eq!(settings.line_height(), 30.625);
+    }
+
+    #[test]
+    fn theme_selection_defaults_and_case_insensitive_names() {
+        for name in ["Gruvbox", "gruvbox", "GRUVBOX"] {
+            let settings = Settings::parse(&format!(r#"{{"theme":"{name}"}}"#)).unwrap();
+            assert_eq!(settings.theme, Theme::Gruvbox);
+            assert_eq!(settings.font_size, 16.);
+        }
+        for value in [r#""Dracula""#, r#""unknown""#, "null", "42"] {
+            let settings =
+                Settings::parse(&format!(r#"{{"theme":{value},"font-size":24}}"#)).unwrap();
+            assert_eq!(settings.theme, Theme::Dracula);
+            assert_eq!(settings.font_size, 24.);
+        }
     }
 
     #[test]
@@ -170,9 +224,9 @@ impl Profile {
             parameters.caret_style = value.into();
         }
         if let Some(value) = object.get("theme").and_then(serde_json::Value::as_str)
-            && value == "Dracula"
+            && let Some(theme) = Theme::parse(value)
         {
-            parameters.theme = value.into();
+            parameters.theme = theme.name().into();
         }
         if let Some(value) = object.get("sound").and_then(serde_json::Value::as_bool) {
             parameters.sound = value;
@@ -184,7 +238,7 @@ impl Profile {
         if !(8.0..=48.0).contains(&parameters.font_size)
             || parameters.font_family != "Google Sans Code"
             || !["Line", "Block", "Underline"].contains(&parameters.caret_style.as_str())
-            || parameters.theme != "Dracula"
+            || Theme::parse(&parameters.theme).is_none()
         {
             return Err("Invalid settings parameters.".into());
         }
@@ -366,6 +420,7 @@ mod parameter_tests {
         let parameters = Parameters {
             font_size: 32.,
             caret_style: "Underline".into(),
+            theme: "Gruvbox".into(),
             sound: true,
             ..Parameters::default()
         };

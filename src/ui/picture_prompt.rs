@@ -83,7 +83,7 @@ impl canvas::Program<Message> for Avatar {
                 iced::advanced::svg::Svg::new(svg::Handle::from_memory(
                     include_bytes!("../../assets/icons/fa-pencil.svg").as_slice(),
                 ))
-                .color(theme::CORRECT),
+                .color(theme::palette().correct),
             );
         }
         vec![frame.into_geometry()]
@@ -172,7 +172,7 @@ impl canvas::Program<Message> for Preview<'_> {
         let mut frame = Frame::new(renderer, bounds.size());
         frame.fill(
             &Path::rectangle(Point::ORIGIN, bounds.size()),
-            theme::CONTROL_BACKGROUND,
+            theme::palette().control_background,
         );
         // A clipped subframe has its own transform. Keep the image rectangle and
         // its clip in actual canvas pixels instead of relying on the parent scale.
@@ -241,7 +241,7 @@ impl canvas::Program<Message> for Mask {
         frame.fill(
             &corners,
             canvas::Fill {
-                style: theme::BACKGROUND.into(),
+                style: theme::palette().background.into(),
                 rule: canvas::fill::Rule::EvenOdd,
             },
         );
@@ -281,13 +281,13 @@ fn action(
     .style(move |_, status| button::Style {
         background: Some(
             if primary {
-                theme::PENDING
+                theme::palette().pending
             } else {
-                theme::CONTROL_BACKGROUND
+                theme::palette().control_background
             }
             .into(),
         ),
-        text_color: theme::CORRECT,
+        text_color: theme::palette().correct,
         border: Border {
             radius: scaled(8.).into(),
             width: if focused || status == button::Status::Hovered {
@@ -295,7 +295,7 @@ fn action(
             } else {
                 0.
             },
-            color: theme::CORRECT,
+            color: theme::palette().correct,
         },
         ..Default::default()
     })
@@ -361,7 +361,8 @@ fn view_scaled(picture: &Picture, scale: f32) -> Element<'_, Message> {
     .padding(scaled(3.))
     .on_press_maybe((!busy).then_some(Message::DiscardPicture))
     .style(|_, status| button::Style {
-        background: (status == button::Status::Hovered).then_some(theme::CONTROL_BACKGROUND.into()),
+        background: (status == button::Status::Hovered)
+            .then_some(theme::palette().control_background.into()),
         ..Default::default()
     });
     let zoom: Element<'_, Message> = if let Some(crop) = &picture.crop {
@@ -371,15 +372,18 @@ fn view_scaled(picture: &Picture, scale: f32) -> Element<'_, Message> {
             .height(scaled(12.))
             .style(move |_, _| slider::Style {
                 rail: slider::Rail {
-                    backgrounds: (theme::CORRECT.into(), theme::CORRECT.into()),
+                    backgrounds: (
+                        theme::palette().correct.into(),
+                        theme::palette().correct.into(),
+                    ),
                     width: scaled(4.),
                     border: Border::default().rounded(scaled(2.)),
                 },
                 handle: slider::Handle {
                     shape: slider::HandleShape::Circle { radius: scaled(6.) },
-                    background: theme::PENDING.into(),
+                    background: theme::palette().pending.into(),
                     border_width: if picture.focus == 0 { scaled(1.) } else { 0. },
-                    border_color: theme::CORRECT,
+                    border_color: theme::palette().correct,
                 },
             })
             .into()
@@ -436,9 +440,9 @@ fn view_scaled(picture: &Picture, scale: f32) -> Element<'_, Message> {
         .height(scaled(230.)),
     )
     .style(move |_| container::Style {
-        background: Some(theme::BACKGROUND.into()),
+        background: Some(theme::palette().background.into()),
         border: Border::default().rounded(scaled(8.)),
-        text_color: Some(theme::CORRECT),
+        text_color: Some(theme::palette().correct),
         ..Default::default()
     });
     let mut contents = column![card].align_x(iced::Center).spacing(scaled(10.));
@@ -447,7 +451,7 @@ fn view_scaled(picture: &Picture, scale: f32) -> Element<'_, Message> {
             scrollable(
                 text(error)
                     .size(scaled(10.))
-                    .color(theme::INCORRECT)
+                    .color(theme::palette().incorrect)
                     .center(),
             )
             .width(scaled(200.))
@@ -591,7 +595,7 @@ mod rendering_tests {
             &mut renderer,
             &Theme::Dark,
             &iced::advanced::renderer::Style {
-                text_color: theme::CORRECT,
+                text_color: theme::palette().correct,
             },
             Layout::new(&node),
             cursor,
@@ -600,7 +604,7 @@ mod rendering_tests {
         renderer.screenshot(
             iced::Size::new(size.width as u32, size.height as u32),
             1.,
-            theme::BACKGROUND,
+            theme::palette().background,
         )
     }
     #[test]

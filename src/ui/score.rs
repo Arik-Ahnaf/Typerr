@@ -109,7 +109,7 @@ impl ScoreCanvas<'_> {
                 content: value.into(),
                 size: size.into(),
                 font: theme::FONT,
-                color: theme::alpha(theme::PENDING, self.opacity),
+                color: theme::alpha(theme::palette().pending, self.opacity),
                 ..Text::default()
             }
             .draw_with(|path, color| frame.fill(&path, color));
@@ -119,14 +119,14 @@ impl ScoreCanvas<'_> {
     fn restart_hint(&self, frame: &mut Frame) {
         frame.fill(
             &Path::rounded_rectangle(Point::new(252., 37.), iced::Size::new(50., 25.), 8.into()),
-            theme::alpha(theme::PENDING, self.opacity),
+            theme::alpha(theme::palette().pending, self.opacity),
         );
         frame.fill_text(Text {
             content: "Tab".into(),
             position: Point::new(277., 40.),
             size: 16.into(),
             font: theme::SEMIBOLD_FONT,
-            color: theme::alpha(theme::BACKGROUND, self.opacity),
+            color: theme::alpha(theme::palette().background, self.opacity),
             align_x: iced::alignment::Horizontal::Center.into(),
             line_height: iced::widget::text::LineHeight::Absolute(20.into()),
             ..Text::default()
@@ -136,7 +136,7 @@ impl ScoreCanvas<'_> {
             position: Point::new(307., 40.),
             size: 16.into(),
             font: theme::SEMIBOLD_FONT,
-            color: theme::alpha(theme::PENDING, self.opacity),
+            color: theme::alpha(theme::palette().pending, self.opacity),
             line_height: iced::widget::text::LineHeight::Absolute(20.into()),
             ..Text::default()
         });
@@ -179,7 +179,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
             let bottom = point(second, 0., maximum);
             frame.stroke(
                 &Path::line(top, bottom),
-                stroke(theme::alpha(theme::GRAPH_GRID, 0.6), 1.),
+                stroke(theme::alpha(theme::palette().control_background, 0.6), 1.),
             );
             frame.fill_text(Text {
                 content: number(second),
@@ -187,7 +187,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
                 size: 12.into(),
                 font: theme::FONT,
                 align_x: iced::alignment::Horizontal::Center.into(),
-                color: theme::alpha(theme::PENDING, self.opacity),
+                color: theme::alpha(theme::palette().pending, self.opacity),
                 ..Text::default()
             });
         }
@@ -196,7 +196,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
             let left = point(0., value, maximum);
             frame.stroke(
                 &Path::line(left, point(duration, value, maximum)),
-                stroke(theme::alpha(theme::GRAPH_GRID, 0.6), 1.),
+                stroke(theme::alpha(theme::palette().control_background, 0.6), 1.),
             );
             self.rotated(
                 &mut frame,
@@ -221,7 +221,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
                 638.,
                 point(duration, errors, error_maximum).y - 7.,
                 11.,
-                theme::PENDING,
+                theme::palette().pending,
             );
         }
         self.rotated(
@@ -233,7 +233,10 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
         );
         // The curves and markers use their own clipped frame; axis labels do not.
         frame.with_clip(PLOT, |frame| {
-            for (raw, color) in [(true, theme::GRAPH_RAW), (false, theme::GRAPH_WPM)] {
+            for (raw, color) in [
+                (true, theme::palette().pending),
+                (false, theme::palette().blue),
+            ] {
                 let points: Vec<_> = score
                     .samples
                     .iter()
@@ -264,21 +267,21 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
                             Point::new(x - 2.5, y - 2.5 * direction),
                             Point::new(x + 2.5, y + 2.5 * direction),
                         ),
-                        stroke(theme::GRAPH_ERROR, 1.5),
+                        stroke(theme::palette().incorrect, 1.5),
                     );
                 }
             }
         });
-        self.text(&mut frame, "WPM", 50., 100., 24., theme::CORRECT);
+        self.text(&mut frame, "WPM", 50., 100., 24., theme::palette().correct);
         self.text(
             &mut frame,
             &format!("{:.0}", score.wpm),
             50.,
             130.,
             metric_size(score.wpm, 32.),
-            theme::BLUE,
+            theme::palette().blue,
         );
-        self.text(&mut frame, "ACC", 50., 175., 24., theme::CORRECT);
+        self.text(&mut frame, "ACC", 50., 175., 24., theme::palette().correct);
         self.text(
             &mut frame,
             &format!("{:.0}%", score.accuracy),
@@ -289,7 +292,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
             } else {
                 32.
             },
-            theme::BLUE,
+            theme::palette().blue,
         );
         for (label, value, x) in [
             ("Raw", format!("{:.0}", score.raw), 180.),
@@ -300,14 +303,14 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
                 410.,
             ),
         ] {
-            self.text(&mut frame, label, x, 270., 16., theme::CORRECT);
+            self.text(&mut frame, label, x, 270., 16., theme::palette().correct);
             self.text(
                 &mut frame,
                 &value,
                 x,
                 290.,
                 (120. / value.len().max(5) as f32).min(24.),
-                theme::BLUE,
+                theme::palette().blue,
             );
         }
         vec![frame.into_geometry()]
@@ -321,7 +324,7 @@ pub fn view(score: &Score, opacity: f32, enabled: bool) -> Element<'_, Message> 
             .height(height)
             .opacity(opacity)
             .style(|_, _| svg::Style {
-                color: Some(theme::PENDING),
+                color: Some(theme::palette().pending),
             });
         tooltip(
             button(container(artwork).center_x(36).center_y(40))
@@ -330,7 +333,7 @@ pub fn view(score: &Score, opacity: f32, enabled: bool) -> Element<'_, Message> 
                 .style(move |_, status| iced::widget::button::Style {
                     background: (enabled
                         && matches!(status, iced::widget::button::Status::Hovered))
-                    .then_some(theme::alpha(theme::CONTROL_BACKGROUND, 0.35).into()),
+                    .then_some(theme::alpha(theme::palette().control_background, 0.35).into()),
                     border: iced::Border::default().rounded(4),
                     ..Default::default()
                 }),

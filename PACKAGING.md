@@ -179,5 +179,11 @@ Zenity; these are optional runtime dependencies for picture selection.
 The Settings Save button reuses bundled Google Sans Code Bold and its existing
 OFL notice. Settings saves use the same
 atomic configuration writer and user-directory fallback as name onboarding.
-Only the existing font-size value currently affects behavior after restart;
-font-family, caret-style, theme, and sound are saved for the Settings UI.
+Font size and theme take effect after restart; font-family, caret-style, and
+sound are saved for the Settings UI.
+
+Select the bundled palette with `"theme": "Gruvbox"`, `"theme": "Dracula"`, or `"theme": "VSCode"`
+in settings.json, or choose it in Settings and Save. Restart to apply. Theme
+names are case-insensitive; absent or unsupported values use Dracula. All
+palettes are embedded, so switching does not require a rebuild or theme files.
+Editing palette JSON colors requires rebuilding. See [themes/README.md](themes/README.md).

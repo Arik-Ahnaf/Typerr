@@ -11,7 +11,7 @@ fn icon(bytes: &'static [u8], width: f32, height: f32) -> svg::Svg<'static> {
         .width(width)
         .height(height)
         .style(|_, _| svg::Style {
-            color: Some(theme::CORRECT),
+            color: Some(theme::palette().correct),
         })
 }
 
@@ -25,9 +25,9 @@ fn control(
         .opacity(opacity)
         .style(move |_, _| svg::Style {
             color: Some(if active {
-                theme::CORRECT
+                theme::palette().correct
             } else {
-                theme::PENDING
+                theme::palette().pending
             }),
         });
     button(container(glyph).center_x(35).center_y(30))
@@ -45,7 +45,7 @@ fn group(
     container(row![left, right])
         .padding([0, 5])
         .style(move |_| container::Style {
-            background: Some(theme::alpha(theme::CONTROL_BACKGROUND, opacity).into()),
+            background: Some(theme::alpha(theme::palette().control_background, opacity).into()),
             border: iced::Border::default().rounded(8),
             ..Default::default()
         })
@@ -89,12 +89,12 @@ pub fn user_name(name: &str, enabled: bool) -> Element<'_, Message> {
     .padding(0)
     .on_press_maybe(enabled.then_some(Message::Dashboard))
     .style(|_, status| button::Style {
-        background: Some(theme::CONTROL_BACKGROUND.into()),
+        background: Some(theme::palette().control_background.into()),
         border: iced::Border::default().rounded(8),
         text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-            theme::CORRECT
+            theme::palette().correct
         } else {
-            theme::PENDING
+            theme::palette().pending
         },
         ..Default::default()
     });
@@ -214,9 +214,9 @@ fn amount_bar(mode: Mode) -> Element<'static, Message> {
             .on_press(Message::SelectAmount(mode, amount))
             .style(|_, status| button::Style {
                 text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-                    theme::BLUE
+                    theme::palette().blue
                 } else {
-                    theme::CORRECT
+                    theme::palette().correct
                 },
                 ..Default::default()
             })
@@ -226,7 +226,7 @@ fn amount_bar(mode: Mode) -> Element<'static, Message> {
         .center_x(170)
         .height(30)
         .style(|_| container::Style {
-            background: Some(theme::CONTROL_BACKGROUND.into()),
+            background: Some(theme::palette().control_background.into()),
             border: iced::Border::default().rounded(8),
             ..Default::default()
         })
@@ -254,9 +254,9 @@ fn connection(
                 .opacity(opacity)
                 .style(move |_, _| svg::Style {
                     color: Some(if name == "Github" {
-                        theme::CORRECT
+                        theme::palette().correct
                     } else {
-                        theme::BLUE
+                        theme::palette().blue
                     })
                 }),
             label(name)
@@ -269,9 +269,9 @@ fn connection(
     .style(move |_, status| button::Style {
         text_color: theme::alpha(
             if matches!(status, button::Status::Hovered) {
-                theme::BLUE
+                theme::palette().blue
             } else {
-                theme::CORRECT
+                theme::palette().correct
             },
             opacity,
         ),
@@ -316,9 +316,10 @@ pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
         )
         .opacity(opacity)
         .style(|_, _| svg::Style {
-            color: Some(theme::ORANGE)
+            color: Some(theme::palette().orange)
         }),
-        label(concat!("V", env!("CARGO_PKG_VERSION"))).color(theme::alpha(theme::CORRECT, opacity))
+        label(concat!("V", env!("CARGO_PKG_VERSION")))
+            .color(theme::alpha(theme::palette().correct, opacity))
     ]
     .spacing(5)
     .align_y(iced::Center);
@@ -330,9 +331,9 @@ pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
         )
         .opacity(opacity)
         .style(|_, _| svg::Style {
-            color: Some(theme::ORANGE)
+            color: Some(theme::palette().orange)
         }),
-        label(theme::NAME).color(theme::alpha(theme::CORRECT, opacity))
+        label(theme::palette().name).color(theme::alpha(theme::palette().correct, opacity))
     ]
     .spacing(5)
     .align_y(iced::Center);

@@ -311,7 +311,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
             )
             .with_content(self.monitor.clone()),
             Point::new(origin.x, origin.y - 30.0),
-            theme::alpha(theme::BLUE, self.opacity),
+            theme::alpha(theme::palette().blue, self.opacity),
             *_viewport,
         );
         let clip = Rectangle {
@@ -337,9 +337,9 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
                         .character_state(index)
                         .expect("layout indexes target");
                     let mut color = match status {
-                        CharacterState::Pending => theme::PENDING,
-                        CharacterState::Correct => theme::CORRECT,
-                        CharacterState::Incorrect => theme::INCORRECT,
+                        CharacterState::Pending => theme::palette().pending,
+                        CharacterState::Correct => theme::palette().correct,
+                        CharacterState::Incorrect => theme::palette().incorrect,
                     };
                     color.a *= opacity * self.opacity;
                     let x = origin.x + (index - range.start) as f32 * measured.advance;
@@ -399,7 +399,7 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
                         },
                         ..Default::default()
                     },
-                    theme::alpha(theme::CYAN, self.opacity),
+                    theme::alpha(theme::palette().cyan, self.opacity),
                 );
             });
         }

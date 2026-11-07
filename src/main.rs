@@ -28,6 +28,7 @@ fn main() -> iced::Result {
         }
     };
     let settings = settings::Settings::load();
+    ui::theme::initialize(settings.theme);
     let window_size = iced::Size::new(
         700.0,
         ui::theme::minimum_window_height(settings.line_height()),
@@ -103,8 +104,8 @@ fn main() -> iced::Result {
         ..Default::default()
     })
     .style(|_, _| iced::theme::Style {
-        background_color: ui::theme::BACKGROUND,
-        text_color: ui::theme::CORRECT,
+        background_color: ui::theme::palette().background,
+        text_color: ui::theme::palette().correct,
     })
     .run()
 }

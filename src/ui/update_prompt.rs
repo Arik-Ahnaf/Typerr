@@ -28,8 +28,9 @@ pub fn view(updater: &Updater) -> Element<'_, Message> {
         text(title)
             .size(23)
             .font(theme::SEMIBOLD_FONT)
-            .color(theme::CORRECT),
-        scrollable(text(description).size(14).color(theme::CORRECT)).height(iced::Length::Shrink)
+            .color(theme::palette().correct),
+        scrollable(text(description).size(14).color(theme::palette().correct))
+            .height(iced::Length::Shrink)
     ]
     .spacing(18);
     if let Phase::Downloading { received, total } = updater.phase {
@@ -38,8 +39,8 @@ pub fn view(updater: &Updater) -> Element<'_, Message> {
                 progress_bar(0.0..=1.0, received as f32 / total.max(1) as f32)
                     .girth(8)
                     .style(|_| progress_bar::Style {
-                        background: theme::CONTROL_BACKGROUND.into(),
-                        bar: theme::BLUE.into(),
+                        background: theme::palette().control_background.into(),
+                        bar: theme::palette().blue.into(),
                         border: Border {
                             radius: 4.into(),
                             ..Default::default()
@@ -53,7 +54,7 @@ pub fn view(updater: &Updater) -> Element<'_, Message> {
                     total as f64 / 1_048_576.
                 ))
                 .size(12)
-                .color(theme::PENDING),
+                .color(theme::palette().pending),
             );
     }
     let action = |label: &'static str, message, focused| {
@@ -63,13 +64,13 @@ pub fn view(updater: &Updater) -> Element<'_, Message> {
             .style(move |_, status| {
                 let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
                 button::Style {
-                    background: Some(theme::CONTROL_BACKGROUND.into()),
-                    text_color: theme::CORRECT,
+                    background: Some(theme::palette().control_background.into()),
+                    text_color: theme::palette().correct,
                     border: Border {
                         color: if focused || hover {
-                            theme::BLUE
+                            theme::palette().blue
                         } else {
-                            theme::PENDING
+                            theme::palette().pending
                         },
                         width: if focused || hover { 2. } else { 1. },
                         radius: 8.into(),
@@ -111,9 +112,9 @@ pub fn view(updater: &Updater) -> Element<'_, Message> {
         .width(490)
         .max_height(340)
         .style(|_| container::Style {
-            background: Some(theme::BACKGROUND.into()),
+            background: Some(theme::palette().background.into()),
             border: Border {
-                color: theme::PENDING,
+                color: theme::palette().pending,
                 width: 1.,
                 radius: 12.into(),
             },
