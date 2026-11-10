@@ -1138,3 +1138,26 @@ Validation:
   restore paths, not an OS-level close/relaunch. Native Windows/Wayland checks
   remain unverified. No packages, push, or publication; no additional feature work
   is required for course persistence.
+
+## Score page scaling — 2026-11-10
+
+- Replaced the fixed-size Score surface with a native responsive composition.
+  The 700 × 400 reference scales uniformly by the smaller window-axis ratio
+  and remains centered. Metrics, graph axes/curves/markers/clipping, stroke
+  widths, restart hint, and Next/Retry artwork and hit targets scale together.
+  Shared branding and account controls retain their existing fixed geometry.
+  This supersedes the earlier fixed-size Score layout; scoring, completion,
+  crossfade, and navigation behavior are unchanged. No dependency was added.
+- Formatting, strict all-target Clippy, all 134 existing tests, and locked
+  debug/release builds pass with CARGO_BUILD_JOBS=2; git diff --check passes.
+- A temporary native software-renderer harness exercised the production widgets
+  at 700 × 400, 1000 × 650, 1400 × 800, 1920 × 1080, 1600 × 400, and 700 × 900,
+  then resized back to the reference size. Button-edge pointer events emitted
+  Next/Retry correctly at every size; disabled fade controls emitted nothing.
+  The 700 × 400 rendering is pixel-identical to the pre-change Score view.
+  Inspected reference, larger, and tall screenshots for legibility, graph
+  clipping, proportions, and fixed shared header placement. Captures/harness:
+  target/score-scaling-verification/.
+- These are headless native-renderer and synthetic pointer checks, not OS-level
+  GUI interaction or Windows/Wayland validation. Native platform resizing and
+  physical-pointer checks remain recommended. No packages, push, or publication.

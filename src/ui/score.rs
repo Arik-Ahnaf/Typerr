@@ -2,7 +2,7 @@
 use super::theme;
 use crate::app::Message;
 use canvas::{Frame, Path, Stroke, Text};
-use iced::widget::{button, canvas, container, row, stack, svg, tooltip};
+use iced::widget::{button, canvas, container, responsive, row, stack, svg, tooltip};
 use iced::{Element, Point, Rectangle, Renderer, Theme, Vector, mouse};
 use typerr::statistics::Score;
 
@@ -153,6 +153,8 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
         _: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
+        let scale = bounds.width / 700.;
+        frame.scale(scale);
         self.restart_hint(&mut frame);
         let score = self.score;
         let duration = score.elapsed.as_secs_f32().max(1.);
@@ -170,7 +172,7 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
         let stroke = |color, width| {
             Stroke::default()
                 .with_color(theme::alpha(color, self.opacity))
-                .with_width(width)
+                .with_width(width * scale)
         };
         let time_step = tick_step(duration, 8.);
         for tick in 0..=(duration / time_step).floor() as usize {
@@ -232,7 +234,10 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
             11.,
         );
         // The curves and markers use their own clipped frame; axis labels do not.
-        frame.with_clip(PLOT, |frame| {
+        // A clipped frame starts with its own identity transform. Scale both
+        // its clipping bounds and its contents to match the surrounding axes.
+        frame.with_clip(PLOT * scale, |frame| {
+            frame.scale(scale);
             for (raw, color) in [
                 (true, theme::palette().pending),
                 (false, theme::palette().blue),
@@ -318,25 +323,41 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
 }
 
 pub fn view(score: &Score, opacity: f32, enabled: bool) -> Element<'_, Message> {
+    responsive(move |size| {
+        // Preserve the reference proportions, including glyphs and hit targets.
+        // The shared header is composed separately by App and stays fixed-size.
+        let scale = (size.width / 700.).min(size.height / 400.).max(0.001);
+        container(scaled_view(score, opacity, enabled, scale))
+            .center_x(iced::Fill)
+            .center_y(iced::Fill)
+            .into()
+    })
+    .into()
+}
+
+fn scaled_view(score: &Score, opacity: f32, enabled: bool, scale: f32) -> Element<'_, Message> {
     let control = |label, message, bytes: &'static [u8], width, height| {
         let artwork = svg(svg::Handle::from_memory(bytes))
-            .width(width)
-            .height(height)
+            .width(width * scale)
+            .height(height * scale)
             .opacity(opacity)
             .style(|_, _| svg::Style {
                 color: Some(theme::palette().pending),
             });
         tooltip(
-            button(container(artwork).center_x(36).center_y(40))
-                .padding(0)
-                .on_press_maybe(enabled.then_some(message))
-                .style(move |_, status| iced::widget::button::Style {
-                    background: (enabled
-                        && matches!(status, iced::widget::button::Status::Hovered))
+            button(
+                container(artwork)
+                    .center_x(36. * scale)
+                    .center_y(40. * scale),
+            )
+            .padding(0)
+            .on_press_maybe(enabled.then_some(message))
+            .style(move |_, status| iced::widget::button::Style {
+                background: (enabled && matches!(status, iced::widget::button::Status::Hovered))
                     .then_some(theme::alpha(theme::palette().control_background, 0.35).into()),
-                    border: iced::Border::default().rounded(4),
-                    ..Default::default()
-                }),
+                border: iced::Border::default().rounded(4. * scale),
+                ..Default::default()
+            }),
             label,
             tooltip::Position::Bottom,
         )
@@ -346,22 +367,22 @@ pub fn view(score: &Score, opacity: f32, enabled: bool) -> Element<'_, Message> 
             "Next test (Tab)",
             Message::Next,
             include_bytes!("../../assets/icons/next.svg"),
-            12,
-            20
+            12.,
+            20.
         ),
         control(
             "Retry same text",
             Message::Retry,
             include_bytes!("../../assets/icons/restart.svg"),
-            25,
-            25
+            25.,
+            25.
         ),
     ];
     stack![
         canvas(ScoreCanvas { score, opacity })
-            .width(700)
-            .height(400),
-        container(controls).padding(iced::Padding::ZERO.left(309.5).top(330))
+            .width(700. * scale)
+            .height(400. * scale),
+        container(controls).padding(iced::Padding::ZERO.left(309.5 * scale).top(330. * scale))
     ]
     .into()
 }
