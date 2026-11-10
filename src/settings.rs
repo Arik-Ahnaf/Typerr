@@ -34,10 +34,108 @@ impl Theme {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CaretStyle {
+    #[default]
+    Line,
+    Block,
+    Underline,
+}
+
+impl CaretStyle {
+    pub fn parse(value: &str) -> Option<Self> {
+        [Self::Line, Self::Block, Self::Underline]
+            .into_iter()
+            .find(|style| value.eq_ignore_ascii_case(style.name()))
+    }
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Line => "Line",
+            Self::Block => "Block",
+            Self::Underline => "Underline",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Mode {
+    #[default]
+    Words,
+    Time,
+}
+
+impl Mode {
+    pub const fn amounts(self) -> [u16; 4] {
+        match self {
+            Self::Words => [10, 25, 50, 100],
+            Self::Time => [15, 30, 60, 120],
+        }
+    }
+}
+
+/// Last selected course, independent of progress and Settings-page drafts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Course {
+    pub mode: Mode,
+    pub word_target: u16,
+    pub time_limit_seconds: u16,
+    pub options: typerr::words::Options,
+}
+
+impl Default for Course {
+    fn default() -> Self {
+        Self {
+            mode: Mode::Words,
+            word_target: 50,
+            time_limit_seconds: 30,
+            options: Default::default(),
+        }
+    }
+}
+
+impl Course {
+    fn parse(value: &serde_json::Value) -> Self {
+        let defaults = Self::default();
+        let amount = |key: &str, mode: Mode, default| {
+            value
+                .get(key)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|v| u16::try_from(v).ok())
+                .filter(|v| mode.amounts().contains(v))
+                .unwrap_or(default)
+        };
+        Self {
+            mode: if value
+                .get("mode")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|s| s.eq_ignore_ascii_case("time"))
+            {
+                Mode::Time
+            } else {
+                Mode::Words
+            },
+            word_target: amount("words", Mode::Words, defaults.word_target),
+            time_limit_seconds: amount("seconds", Mode::Time, defaults.time_limit_seconds),
+            options: typerr::words::Options {
+                punctuation: value
+                    .get("punctuation")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                numbers: value
+                    .get("numbers")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+            },
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct Settings {
     pub font_size: f32,
     pub theme: Theme,
+    pub caret_style: CaretStyle,
 }
 
 impl Default for Settings {
@@ -45,6 +143,7 @@ impl Default for Settings {
         Self {
             font_size: 16.0,
             theme: Theme::default(),
+            caret_style: CaretStyle::default(),
         }
     }
 }
@@ -90,6 +189,11 @@ impl Settings {
         Ok(Self {
             font_size: font_size as f32,
             theme,
+            caret_style: object
+                .get("caret-style")
+                .and_then(serde_json::Value::as_str)
+                .and_then(CaretStyle::parse)
+                .unwrap_or_default(),
         })
     }
 
@@ -101,6 +205,84 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn course_fields_validate_independently_and_preserve_malformed_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let mut profile = Profile::at(path.clone(), None);
+        assert_eq!(profile.course().unwrap(), Course::default());
+        for value in [
+            serde_json::Value::Null,
+            serde_json::json!("bad"),
+            serde_json::json!({"mode":"bad","words":65561,"seconds":-1,"punctuation":"true","numbers":1}),
+        ] {
+            fs::write(&path, serde_json::json!({"course": value}).to_string()).unwrap();
+            assert_eq!(profile.course().unwrap(), Course::default());
+        }
+        fs::write(
+            &path,
+            r#"{"course":{"mode":"time","words":11,"seconds":60,"numbers":true}}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            profile.course().unwrap(),
+            Course {
+                mode: Mode::Time,
+                time_limit_seconds: 60,
+                options: typerr::words::Options {
+                    numbers: true,
+                    punctuation: false
+                },
+                ..Course::default()
+            }
+        );
+        for words in Mode::Words.amounts() {
+            for seconds in Mode::Time.amounts() {
+                let course = Course {
+                    word_target: words,
+                    time_limit_seconds: seconds,
+                    ..Course::default()
+                };
+                profile.save_course(course).unwrap();
+                assert_eq!(profile.course().unwrap(), course);
+            }
+        }
+        for source in ["{", "[]"] {
+            fs::write(&path, source).unwrap();
+            assert!(profile.course().is_err());
+            assert!(profile.save_course(Course::default()).is_err());
+            assert_eq!(fs::read_to_string(&path).unwrap(), source);
+        }
+    }
+
+    #[test]
+    fn caret_styles_parse_and_round_trip_through_saved_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        for style in [CaretStyle::Line, CaretStyle::Block, CaretStyle::Underline] {
+            for name in [style.name().to_owned(), style.name().to_lowercase()] {
+                fs::write(&path, serde_json::json!({"caret-style": name}).to_string()).unwrap();
+                let mut profile = Profile::at(path.clone(), None);
+                let parameters = profile.parameters().unwrap();
+                assert_eq!(parameters.caret_style, style.name());
+                profile.save_parameters(&parameters).unwrap();
+                assert_eq!(
+                    Settings::parse(&fs::read_to_string(&path).unwrap())
+                        .unwrap()
+                        .caret_style,
+                    style
+                );
+            }
+        }
+        for value in ["null", "42", "true", r#""unknown""#] {
+            let settings =
+                Settings::parse(&format!(r#"{{"caret-style":{value},"font-size":24}}"#)).unwrap();
+            assert_eq!(settings.caret_style, CaretStyle::Line);
+            assert_eq!(settings.font_size, 24.);
+        }
+        assert_eq!(Settings::parse("{}").unwrap().caret_style, CaretStyle::Line);
+    }
 
     #[test]
     fn defaults_and_fractional_sizes() {
@@ -201,6 +383,26 @@ impl Profile {
         Ok(())
     }
 
+    pub fn course(&self) -> Result<Course, String> {
+        let object = read_object(&self.path)?;
+        Ok(object.get("course").map(Course::parse).unwrap_or_default())
+    }
+
+    pub fn save_course(&mut self, course: Course) -> Result<(), String> {
+        if !Mode::Words.amounts().contains(&course.word_target)
+            || !Mode::Time.amounts().contains(&course.time_limit_seconds)
+        {
+            return Err("Invalid course parameters.".into());
+        }
+        self.save_patch(serde_json::json!({"course": {
+            "mode": match course.mode { Mode::Words => "Words", Mode::Time => "Time" },
+            "words": course.word_target,
+            "seconds": course.time_limit_seconds,
+            "punctuation": course.options.punctuation,
+            "numbers": course.options.numbers,
+        }}))
+    }
+
     pub fn parameters(&self) -> Result<Parameters, String> {
         let object = read_object(&self.path)?;
         let mut parameters = Parameters::default();
@@ -219,9 +421,9 @@ impl Profile {
         if let Some(value) = object
             .get("caret-style")
             .and_then(serde_json::Value::as_str)
-            && ["Line", "Block", "Underline"].contains(&value)
+            && let Some(style) = CaretStyle::parse(value)
         {
-            parameters.caret_style = value.into();
+            parameters.caret_style = style.name().into();
         }
         if let Some(value) = object.get("theme").and_then(serde_json::Value::as_str)
             && let Some(theme) = Theme::parse(value)

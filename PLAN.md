@@ -1095,3 +1095,46 @@ Validation:
   builds with two Cargo jobs, and git diff --check passed. Inspected the updated
   software-rendered Typing screenshot under target/gruvbox-verification.
   Native OS interaction, Windows, and Wayland were not re-tested.
+
+## Cursor types — 2026-11-10
+
+- Implemented Line, Block, and Underline from startup `caret-style`, reusing the
+  existing Settings dropdown and atomic Save. Case-insensitive names normalize
+  in the form; missing/unsupported values use Line. Restart applies changes.
+- Added `"caret-style": "Line"` to settings.json while preserving existing local
+  profile/theme/font values. Block and underline use measured cell width, existing
+  animation coordinates, panel clipping, and crossfade opacity. Block redraws
+  intersecting glyph portions in background color to keep them readable.
+- Formatting, strict all-target Clippy, all 131 tests, locked debug/release builds
+  with CARGO_BUILD_JOBS=2, and git diff --check passed. New coverage checks saved
+  configuration round trips/defaults and software-rendered shape bounds at
+  8/16/24/48px. Existing motion/wrap/reset/scroll tests remain passing.
+- No native GUI interaction or Windows/Wayland validation was performed; the
+  pixel checks use the headless software renderer. Native platform visual checks
+  remain recommended. No dependencies, package builds, push, or publication.
+
+## Persistent course choices — 2026-11-10
+
+- Automatically persist mode, remembered Words and Time amounts, punctuation,
+  and numbers as a `course` object in settings.json after an accepted change.
+  Reuse Profile's atomic merge, malformed-file protection, and writable fallback.
+  Report write failures to stderr and Settings while keeping typing usable.
+- Startup restores each validated field and generates a fresh target with the
+  saved options. Progress, elapsed time, score, and target text are not persisted.
+  App::default remains free of filesystem access. No writes on typing/redraws,
+  navigation, rejected choices, or unchanged parameters. Existing Settings Save
+  preserves the course; packaging strips the builder's course alongside name.
+- Mode and its allowed amounts moved to settings.rs, re-exported through app.rs,
+  so parsing and native selectors share validation. No engine/layout/SQLite or
+  dependency changes. Existing cursor work and local settings were preserved.
+- Passed formatting, strict all-target Clippy, all 134 tests, locked debug and
+  release builds (CARGO_BUILD_JOBS=2), and git diff --check. New tests cover fresh
+  app reconstruction from saved Time/120 and Words/25 choices, both generation
+  toggles, independent remembered amounts, reset progress/deadlines, Settings
+  Save compatibility, rejected/no-op actions, invalid fields, supported amount
+  round trips, and malformed-file preservation. A temporary packaging fixture
+  confirmed course/name removal without changing other values or source data.
+- Validation used isolated temporary configuration files and production message/
+  restore paths, not an OS-level close/relaunch. Native Windows/Wayland checks
+  remain unverified. No packages, push, or publication; no additional feature work
+  is required for course persistence.

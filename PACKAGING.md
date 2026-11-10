@@ -179,7 +179,7 @@ Zenity; these are optional runtime dependencies for picture selection.
 The Settings Save button reuses bundled Google Sans Code Bold and its existing
 OFL notice. Settings saves use the same
 atomic configuration writer and user-directory fallback as name onboarding.
-Font size and theme take effect after restart; font-family, caret-style, and
+Font size, theme, and caret style take effect after restart; font-family and
 sound are saved for the Settings UI.
 
 Select the bundled palette with `"theme": "Gruvbox"`, `"theme": "Dracula"`, or `"theme": "VSCode"`
@@ -187,3 +187,13 @@ in settings.json, or choose it in Settings and Save. Restart to apply. Theme
 names are case-insensitive; absent or unsupported values use Dracula. All
 palettes are embedded, so switching does not require a rebuild or theme files.
 Editing palette JSON colors requires rebuilding. See [themes/README.md](themes/README.md).
+
+Set `"caret-style"` to `"Line"` (default), `"Block"`, or `"Underline"` in
+settings.json, or choose Caret Style in Settings and Save. Restart to apply.
+Names are case-insensitive; missing or unsupported values use Line. Block and
+underline span one measured character cell; block keeps covered text readable.
+
+Course selections are automatically saved in settings.json using the same atomic
+writer and user-directory fallback as profile settings. `export-settings.py`
+removes `course` as well as `name` from staged defaults so a builder's last test
+does not become the installed default. Existing user settings remain preserved.

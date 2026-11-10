@@ -320,3 +320,28 @@ The VSCode follow-up also authorizes Monkeytype's VSCode palette using the
 same JSON schema, startup selection, and Settings Save/restart behavior.
 The current selection is preserved when adding a theme. See themes/README.md
 for the official source and role mapping.
+
+## Caret styles — 2026-11-10
+
+The cursor follow-up authorizes Line (default), Block, and Underline rendering
+through startup `caret-style` configuration and the existing Settings Save flow.
+Restart applies changes; names are case-insensitive, invalid/missing values use
+Line. This supersedes statements that caret-style is UI-only. Block and underline
+use measured cell width and shared animated coordinates; block redraws covered
+glyph portions with background color for readability. Preserve movement, clipping,
+input, and viewport policies. No blink or motion setting is added.
+
+## Persistent course choices — 2026-11-10
+
+The last-session follow-up supersedes current-run-only course preferences. Save
+active Words/Time mode, each mode's remembered amount, punctuation, and numbers
+automatically when accepted controls change them. Store the `course` object in
+settings.json through the existing atomic Profile writer and writable fallback,
+preserving unrelated keys and refusing malformed JSON. Never write on typing,
+redraws, menu dismissal, or unchanged/rejected choices. App::default stays free
+of filesystem access. On startup restore validated choices before generating a
+fresh 500-token test; never restore progress, target text, timing, or score.
+Missing/invalid fields individually fall back to Words, 50 words, 30 seconds,
+and disabled toggles. Settings Save preserves the course. Packaging strips the
+builder's course alongside the name. Mode and allowed amounts now live in
+settings.rs and are re-exported from app.rs for native controls.

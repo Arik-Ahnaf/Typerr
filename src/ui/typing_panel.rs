@@ -1,4 +1,5 @@
 use super::{caret::Caret, theme};
+use crate::settings::CaretStyle;
 use iced::advanced::Renderer as _;
 use iced::advanced::text::{Paragraph, Renderer as _};
 use iced::advanced::{
@@ -393,14 +394,76 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
                     renderer::Quad {
                         bounds: Rectangle {
                             x: bounds.x + caret.x,
-                            y: bounds.y + caret.y,
-                            width: 2.0,
-                            height: self.settings.line_height(),
+                            y: bounds.y
+                                + caret.y
+                                + if self.settings.caret_style == CaretStyle::Underline {
+                                    self.settings.line_height() - 2.0
+                                } else {
+                                    0.0
+                                },
+                            width: if self.settings.caret_style == CaretStyle::Line {
+                                2.0
+                            } else {
+                                measured.advance
+                            },
+                            height: if self.settings.caret_style == CaretStyle::Underline {
+                                2.0
+                            } else {
+                                self.settings.line_height()
+                            },
                         },
                         ..Default::default()
                     },
                     theme::alpha(theme::palette().cyan, self.opacity),
                 );
+                if self.settings.caret_style == CaretStyle::Block {
+                    // Redraw intersecting glyph portions in the background color.
+                    // Clipping to the animated block keeps text readable even
+                    // while the caret moves between cells or across rows.
+                    let block = Rectangle {
+                        x: bounds.x + caret.x,
+                        y: bounds.y + caret.y,
+                        width: measured.advance,
+                        height: self.settings.line_height(),
+                    };
+                    if let Some(block_clip) = block.intersection(&clip) {
+                        renderer.with_layer(block_clip, |renderer| {
+                            for line_index in state.viewport.visible_lines(measured.lines.len()) {
+                                let range = &measured.lines[line_index];
+                                let y = origin.y
+                                    + (line_index - state.viewport.top_line) as f32
+                                        * self.settings.line_height();
+                                for index in range.clone() {
+                                    let character = self.session.target()[index];
+                                    let x =
+                                        origin.x + (index - range.start) as f32 * measured.advance;
+                                    let cell = Rectangle {
+                                        x,
+                                        y,
+                                        width: measured.advance,
+                                        height: self.settings.line_height(),
+                                    };
+                                    if character != ' ' && cell.intersects(&block_clip) {
+                                        renderer.fill_text(
+                                            text_definition(
+                                                &character.to_string(),
+                                                Size::new(
+                                                    measured.advance,
+                                                    self.settings.line_height(),
+                                                ),
+                                                self.settings,
+                                            )
+                                            .with_content(character.to_string()),
+                                            Point::new(x, y),
+                                            theme::alpha(theme::palette().background, self.opacity),
+                                            block_clip,
+                                        );
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
             });
         }
     }
@@ -417,6 +480,106 @@ mod tests {
     use super::*;
     use iced::window::{Event as WindowEvent, RedrawRequest};
     use std::time::Duration;
+
+    #[test]
+    fn rendered_cursor_shapes_follow_measured_cells_at_all_font_sizes() {
+        use iced::advanced::renderer::Headless;
+        use std::{
+            future::Future,
+            task::{Context, Poll, Waker},
+        };
+        let mut future = std::pin::pin!(<Renderer as Headless>::new(
+            theme::FONT,
+            16.into(),
+            Some("tiny-skia")
+        ));
+        let Poll::Ready(Some(mut renderer)) = future
+            .as_mut()
+            .poll(&mut Context::from_waker(Waker::noop()))
+        else {
+            panic!("software renderer unavailable")
+        };
+        for font_size in [8., 16., 24., 48.] {
+            for caret_style in [CaretStyle::Line, CaretStyle::Block, CaretStyle::Underline] {
+                let session = TypingSession::new(" ");
+                let mut panel = TypingPanel::new(
+                    &session,
+                    0,
+                    0,
+                    String::new(),
+                    crate::settings::Settings {
+                        font_size,
+                        caret_style,
+                        ..Default::default()
+                    },
+                );
+                let mut tree = tree::Tree::new(&panel as &dyn Widget<(), Theme, Renderer>);
+                let size = Size::new(640., 300.);
+                let node = <TypingPanel<'_> as Widget<(), Theme, Renderer>>::layout(
+                    &mut panel,
+                    &mut tree,
+                    &renderer,
+                    &layout::Limits::new(size, size),
+                );
+                let state = tree.state.downcast_ref::<State>();
+                let caret = state.caret.rendered;
+                let advance = state.layout.as_ref().unwrap().advance;
+                let expected_width = if caret_style == CaretStyle::Line {
+                    2.
+                } else {
+                    advance
+                };
+                let expected_height = if caret_style == CaretStyle::Underline {
+                    2.
+                } else {
+                    font_size * 1.25
+                };
+                let expected_y = caret.y
+                    + if caret_style == CaretStyle::Underline {
+                        font_size * 1.25 - 2.
+                    } else {
+                        0.
+                    };
+                renderer.reset(Rectangle::with_size(size));
+                <TypingPanel<'_> as Widget<(), Theme, Renderer>>::draw(
+                    &panel,
+                    &tree,
+                    &mut renderer,
+                    &Theme::Dark,
+                    &renderer::Style {
+                        text_color: iced::Color::WHITE,
+                    },
+                    Layout::new(&node),
+                    mouse::Cursor::Unavailable,
+                    &Rectangle::with_size(size),
+                );
+                let pixels = renderer.screenshot(Size::new(640, 300), 1., iced::Color::BLACK);
+                let mut colored = Vec::new();
+                for y in 0..300usize {
+                    for x in 0..640usize {
+                        let offset = (y * 640 + x) * 4;
+                        if pixels[offset..offset + 3]
+                            .iter()
+                            .any(|channel| *channel > 0)
+                        {
+                            colored.push((x, y));
+                        }
+                    }
+                }
+                let left = colored.iter().map(|p| p.0).min().unwrap() as f32;
+                let right = colored.iter().map(|p| p.0).max().unwrap() as f32 + 1.;
+                let top = colored.iter().map(|p| p.1).min().unwrap() as f32;
+                let bottom = colored.iter().map(|p| p.1).max().unwrap() as f32 + 1.;
+                assert!(
+                    (left - caret.x).abs() <= 1. && (right - caret.x - expected_width).abs() <= 1.
+                );
+                assert!(
+                    (top - expected_y).abs() <= 1.
+                        && (bottom - expected_y - expected_height).abs() <= 1.
+                );
+            }
+        }
+    }
 
     const MOVEMENT: Duration = Duration::from_millis(100);
 

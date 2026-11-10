@@ -152,12 +152,35 @@ moves between fields, and dropdowns support arrow keys and Enter. Click the
 Typerr brand to start a fresh test. Click Save to atomically save all displayed
 parameters to the selected settings.json, preserving the name and unrelated keys.
 Saved values populate the form on the next launch; unsaved edits last only for
-the current run. Saving does not apply live changes. Font size takes effect on
-restart through the existing startup configuration; theme also takes effect on restart; font family, caret style, and sound remain
-UI-only. Save failures appear beside the button and can be retried.
+the current run. Saving does not apply live changes. Font size, theme, and caret style take
+effect after restart; font family and sound remain UI-only. Save failures appear beside the button and can be retried.
 
 Select the bundled palette with `"theme": "Gruvbox"`, `"theme": "Dracula"`, or `"theme": "VSCode"`
 in settings.json, or choose it in Settings and Save. Restart to apply. Theme
 names are case-insensitive; absent or unsupported values use Dracula. All
 palettes are embedded, so switching does not require a rebuild or theme files.
 Editing palette JSON colors requires rebuilding. See [themes/README.md](themes/README.md).
+
+Set `"caret-style"` to `"Line"` (default), `"Block"`, or `"Underline"` in
+settings.json, or choose Caret Style in Settings and Save. Restart to apply.
+Names are case-insensitive; missing or unsupported values use Line. Block and
+underline span one measured character cell; block keeps covered text readable.
+
+Course choices save automatically whenever you change mode, amount, punctuation,
+or numbers. Relaunch starts a fresh test with those choices, including both
+modes' remembered amounts. No Settings Save or completed test is required.
+The existing settings path and writable user-directory fallback apply. Example:
+
+```json
+"course": {
+  "mode": "Time",
+  "words": 25,
+  "seconds": 60,
+  "punctuation": true,
+  "numbers": false
+}
+```
+
+Words accepts 10/25/50/100; seconds accepts 15/30/60/120. Missing or unsupported
+fields use their defaults independently (Words, 50, 30, false, false). Invalid
+JSON is left untouched; save failures are reported to stderr and in Settings.

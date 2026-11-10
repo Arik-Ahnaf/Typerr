@@ -39,21 +39,7 @@ impl Page {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Mode {
-    #[default]
-    Words,
-    Time,
-}
-
-impl Mode {
-    pub const fn amounts(self) -> [u16; 4] {
-        match self {
-            Self::Words => [10, 25, 50, 100],
-            Self::Time => [15, 30, 60, 120],
-        }
-    }
-}
+pub use crate::settings::Mode;
 
 pub struct App {
     profile: Option<crate::settings::Profile>,
@@ -92,6 +78,15 @@ struct MainTyping {
 }
 
 impl MainTyping {
+    fn course(&self) -> crate::settings::Course {
+        crate::settings::Course {
+            mode: self.mode,
+            word_target: self.word_target as u16,
+            time_limit_seconds: self.time_limit_seconds as u16,
+            options: self.options,
+        }
+    }
+
     fn restart(&mut self) {
         self.replace(words::generate(&mut rand::rng(), self.options));
     }
@@ -219,7 +214,7 @@ impl App {
                 state
             }
         };
-        Self {
+        let mut app = Self {
             profile: Some(profile),
             settings_page,
             picture: crate::profile_picture::Picture::load(
@@ -229,6 +224,22 @@ impl App {
             updater: typerr::update::Updater::start(startup),
             settings,
             ..Self::default()
+        };
+        app.restore_course();
+        app
+    }
+
+    fn restore_course(&mut self) {
+        let Some(profile) = &self.profile else { return };
+        match profile.course() {
+            Ok(course) => {
+                self.main.mode = course.mode;
+                self.main.word_target = usize::from(course.word_target);
+                self.main.time_limit_seconds = u64::from(course.time_limit_seconds);
+                self.main.options = course.options;
+                self.main.restart();
+            }
+            Err(error) => eprintln!("Could not load course preferences: {error}"),
         }
     }
 
@@ -314,7 +325,17 @@ impl App {
     }
 
     fn update_at(&mut self, message: Message, now: Instant) {
+        let previous_course = self.main.course();
         self.handle_at(message, now);
+        let course = self.main.course();
+        if course != previous_course
+            && let Some(profile) = &mut self.profile
+            && let Err(error) = profile.save_course(course)
+        {
+            eprintln!("Could not save course preferences: {error}");
+            self.settings_page.save_result =
+                Some(Err(format!("Could not save course preferences: {error}")));
+        }
         let safe = matches!(self.page, Page::Score | Page::Dashboard | Page::Settings)
             || (self.page == Page::Typing && self.main.started.is_none());
         self.updater
@@ -830,6 +851,95 @@ mod tests {
         Key, Location, Modifiers,
         key::{Named, NativeCode, Physical},
     };
+
+    #[test]
+    fn course_choices_survive_relaunch_with_fresh_progress_and_generated_options() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        std::fs::write(
+            &path,
+            r#"{"name":"Alice","caret-style":"Block","future":42}"#,
+        )
+        .unwrap();
+        let launch = || {
+            let mut app = App {
+                profile: Some(crate::settings::Profile::at(path.clone(), None)),
+                ..App::default()
+            };
+            app.restore_course();
+            app
+        };
+        let mut app = launch();
+        select_amount(&mut app, Mode::Words, 25);
+        select_amount(&mut app, Mode::Time, 120);
+        app.update(Message::ToggleNumbers);
+        app.update(Message::TogglePunctuation);
+        app.update(key(
+            Key::Character("a".into()),
+            Some("a"),
+            Modifiers::empty(),
+        ));
+        assert!(app.main.started.is_some());
+        let expected = app.main.course();
+        drop(app);
+        let mut app = launch();
+        assert_eq!(app.main.course(), expected);
+        assert_eq!(app.main.monitor(), "120s");
+        assert_eq!(app.main.session.position(), 0);
+        assert!(app.main.started.is_none() && app.main.deadline.is_none());
+        assert!(app.main.session.target().iter().any(char::is_ascii_digit));
+        assert!(
+            app.main
+                .session
+                .target()
+                .iter()
+                .any(|c| ",.!?;:".contains(*c))
+        );
+        app.update(Message::SelectMode(Mode::Words));
+        drop(app);
+        let mut app = launch();
+        assert_eq!(app.main.monitor(), "0/25");
+        assert_eq!(app.main.time_limit_seconds, 120);
+        app.update(Message::OpenSettings);
+        app.update(Message::Settings(crate::ui::settings_page::Event::Save));
+        assert_eq!(launch().main.course(), app.main.course());
+        let saved: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(saved["name"], "Alice");
+        assert_eq!(saved["future"], 42);
+    }
+
+    #[test]
+    fn course_persistence_ignores_navigation_typing_and_rejected_choices() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.json");
+        let source = r#"{"name":"Alice"}"#;
+        std::fs::write(&path, source).unwrap();
+        let mut app = App {
+            profile: Some(crate::settings::Profile::at(path.clone(), None)),
+            ..App::default()
+        };
+        app.restore_course();
+        for message in [
+            Message::SelectMode(Mode::Words),
+            Message::ToggleAmountPicker(Mode::Time),
+            Message::SelectAmount(Mode::Time, 999),
+            Message::DismissAmountPicker,
+            key(Key::Character("a".into()), Some("a"), Modifiers::empty()),
+            Message::Dashboard,
+            Message::SelectMode(Mode::Time),
+            Message::BackToTyping,
+        ] {
+            app.update(message);
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), source);
+        }
+        // A file damaged after startup must not be overwritten by automatic saves.
+        std::fs::write(&path, "{").unwrap();
+        app.update(Message::ToggleNumbers);
+        assert!(app.main.options.numbers);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{");
+        assert!(matches!(app.settings_page.save_result, Some(Err(_))));
+    }
 
     fn key(key: Key, text: Option<&str>, modifiers: Modifiers) -> Message {
         Message::Native(Event::Keyboard(keyboard::Event::KeyPressed {
