@@ -1,0 +1,24 @@
+name: Discord Release Notification
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  discord-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Notify Discord of New Release
+        uses: SethCohen/github-releases-to-discord@v1.20.0
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          color: "2105893"
+          username: "Typerr Releases"
+          avatar_url: "https://media.discordapp.net/attachments/568049200080748572/1570301606157615196/500px-Github-desktop-logo-symbol.svg.png?ex=6af698d5&is=6af54755&hm=8c443a6bcd75d396f46ce0629537dd0d131a383665259dea102289c5bd77c1d2&=&format=webp&quality=lossless"
+          content: "<@&1570295363837894707> 🚀 A new Typerr release just dropped!"
+          footer_title: "Typerr Changelog"
+          footer_timestamp: true
+          reduce_headings: true
