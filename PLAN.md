@@ -1161,3 +1161,41 @@ Validation:
 - These are headless native-renderer and synthetic pointer checks, not OS-level
   GUI interaction or Windows/Wayland validation. Native platform resizing and
   physical-pointer checks remain recommended. No packages, push, or publication.
+
+
+## Discrete page sizing — 2026-11-12
+
+- Replaced continuous page scaling with shared Design/Medium/Large/ExtraLarge
+  presets in src/ui/sizing.rs. Both window axes must meet a threshold: base
+  through 1000 × 500, 125% above both 1000/500, 150% from 1400 × 800, and
+  200% from 1800 × 1000. Portrait and wide/short windows choose the largest
+  fitting preset. Score, Dashboard, and Settings center fixed compositions;
+  shared branding/account/greeting and Home targets stay fixed.
+- Typing uses fixed panel widths per preset and applies preset sizes to measured
+  text, caret, counter, insets, controls, amount menus, and footer. Configured
+  font size remains the base without settings writes; large fonts select a
+  smaller preset if necessary to retain four rows and exterior clearance.
+  Existing session, timer, synchronous input, scrolling, and caret reset policies
+  remain intact. The image editor uses the same four discrete sizes; its crop,
+  preview, and hit geometry remain aligned. Name/updater dialogs remain fixed.
+- Settings uses discrete geometry and its gentler search text sizes of
+  16/17/18/20px. Save, category offsets, scrolling, and focus reveal use the
+  chosen preset. Updated the Save pointer test for all four presets and exact
+  threshold sizes. Added boundary/aspect-ratio tests and a native measured
+  typing-layout regression across all presets, including shrinking back,
+  8/16/16.5/24/48px fonts, four-row visibility, and unchanged logical position.
+- Validation: formatting, strict all-target Clippy, all 137 tests, locked debug
+  and release builds (CARGO_BUILD_JOBS=2), and git diff --check pass. Native
+  software-renderer captures cover all four presets, exact thresholds, and
+  wide/short and narrow/tall windows. Compared paired sizes inside each preset:
+  page-body text/geometry pixels match after recentering, with only avatar
+  resampling differences confined to its fixed-size image bounds. Inspected
+  Typing, Score, Dashboard, Settings, and editor screenshots for layout/clipping.
+- Synthetic pointer checks through the production widgets pass for typing
+  toggles, amount selection, Score Next/Retry edges, Dashboard avatar, Settings
+  Save, and editor Save at all presets. Existing crop/save and focus/scroll
+  tests also pass. Harness/captures: target/preset-verification/.
+- Checks use headless native rendering and synthetic input; OS-level resizing,
+  physical pointer interaction, and native Windows/Wayland validation remain
+  unverified and recommended. No dependencies, persistence schema changes,
+  packages, push, or publication.

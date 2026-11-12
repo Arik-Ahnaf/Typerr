@@ -10,7 +10,7 @@ use typerr::storage::{DashboardData, TestMode};
 
 const NA: &str = "N/A";
 
-/// Stretch the design layout to the viewport; keep glyphs and artwork undistorted.
+/// Scale the fixed preset surface; keep glyphs and artwork undistorted.
 #[derive(Clone, Copy)]
 struct Scale {
     x: f32,
@@ -407,7 +407,8 @@ pub fn view<'a>(
     avatar: &'a iced::widget::image::Handle,
 ) -> Element<'a, Message> {
     responsive(move |size| {
-        let scale = Scale::new(size);
+        let preset_size = super::sizing::Preset::for_window(size).size();
+        let scale = Scale::new(preset_size);
         let content = scale.content();
         let avatar_center = scale.point(Point::new(95., 125.));
         let avatar = super::picture_prompt::avatar(avatar, 80. * content);
@@ -436,17 +437,20 @@ pub fn view<'a>(
             "New test (Tab)",
             tooltip::Position::Bottom,
         );
-        stack![
+        let body = stack![
             canvas(DashboardCanvas { data, name })
-                .width(iced::Fill)
-                .height(iced::Fill),
-            chrome::brand(),
-            greeting,
+                .width(preset_size.width)
+                .height(preset_size.height),
             container(avatar).padding(
                 iced::Padding::ZERO
                     .left(avatar_center.x - 40. * content)
                     .top(avatar_center.y - 40. * content)
             ),
+        ];
+        stack![
+            container(body).center_x(iced::Fill).center_y(iced::Fill),
+            chrome::brand(),
+            greeting,
             container(home).padding(iced::Padding::ZERO.left(50).top(30)),
         ]
         .width(iced::Fill)

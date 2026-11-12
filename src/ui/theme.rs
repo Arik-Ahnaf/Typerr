@@ -30,7 +30,6 @@ pub const BRAND_FONT: Font = Font::with_name("Jomhuria");
 pub const LINE_HEIGHT: f32 = 20.0;
 pub const INSET: f32 = 20.0;
 pub const VERTICAL_INSET: f32 = 15.0;
-pub const TYPING_MAX_WIDTH: f32 = 700.0;
 pub const VERTICAL_CLEARANCE: f32 = 125.0;
 
 pub fn alpha(mut color: Color, opacity: f32) -> Color {

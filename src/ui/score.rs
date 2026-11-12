@@ -326,7 +326,7 @@ pub fn view(score: &Score, opacity: f32, enabled: bool) -> Element<'_, Message> 
     responsive(move |size| {
         // Preserve the reference proportions, including glyphs and hit targets.
         // The shared header is composed separately by App and stays fixed-size.
-        let scale = (size.width / 700.).min(size.height / 400.).max(0.001);
+        let scale = super::sizing::Preset::for_window(size).scale();
         container(scaled_view(score, opacity, enabled, scale))
             .center_x(iced::Fill)
             .center_y(iced::Fill)

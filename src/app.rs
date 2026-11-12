@@ -1,7 +1,7 @@
 use crate::ui::typing_panel::TypingPanel;
 use iced::{
     Element, Event, keyboard,
-    widget::{Space, container, mouse_area, stack},
+    widget::{Space, container, mouse_area, responsive, stack},
     window,
 };
 use std::time::{Duration, Instant};
@@ -673,6 +673,20 @@ impl App {
     }
 
     fn typing_view(&self, opacity: f32, enabled: bool) -> Element<'_, Message> {
+        responsive(move |size| {
+            let preset = crate::ui::sizing::Preset::for_typing(size, self.settings.line_height());
+            self.typing_view_preset(opacity, enabled, preset)
+        })
+        .into()
+    }
+
+    fn typing_view_preset(
+        &self,
+        opacity: f32,
+        enabled: bool,
+        preset: crate::ui::sizing::Preset,
+    ) -> Element<'_, Message> {
+        let scale = preset.scale();
         let panel = container(
             TypingPanel::new(
                 &self.main.session,
@@ -681,16 +695,17 @@ impl App {
                 self.main.monitor(),
                 self.settings,
             )
+            .preset(preset)
             .presentation(opacity, enabled),
         )
-        .max_width(crate::ui::theme::TYPING_MAX_WIDTH)
-        .max_height(crate::ui::theme::typing_height(self.settings.line_height()));
+        .width(640. * scale)
+        .height((crate::ui::theme::typing_height(self.settings.line_height()) * scale).ceil());
         let typing = container(panel)
             .padding(iced::Padding {
-                top: crate::ui::theme::VERTICAL_CLEARANCE,
-                bottom: crate::ui::theme::VERTICAL_CLEARANCE,
-                left: 30.0,
-                right: 30.0,
+                top: crate::ui::theme::VERTICAL_CLEARANCE * scale,
+                bottom: crate::ui::theme::VERTICAL_CLEARANCE * scale,
+                left: 30. * scale,
+                right: 30. * scale,
             })
             .width(iced::Fill)
             .align_x(iced::Center)
@@ -706,7 +721,7 @@ impl App {
         };
         stack![
             typing,
-            container(crate::ui::chrome::footer(opacity, enabled))
+            container(crate::ui::chrome::footer(opacity, enabled, scale))
                 .height(iced::Fill)
                 .align_y(iced::Bottom),
             dismiss,
@@ -715,7 +730,8 @@ impl App {
                 self.main.options,
                 self.main.amount_picker,
                 opacity,
-                enabled
+                enabled,
+                scale
             ),
         ]
         .into()
@@ -1013,7 +1029,15 @@ mod tests {
             std::fs::read_to_string(&path).unwrap(),
             r#"{"name":"Alice","custom":123}"#
         );
-        for size in [iced::Size::new(700., 400.), iced::Size::new(1100., 650.)] {
+        for size in [
+            iced::Size::new(700., 400.),
+            iced::Size::new(1000., 500.),
+            iced::Size::new(1001., 501.),
+            iced::Size::new(1400., 800.),
+            iced::Size::new(1800., 1000.),
+        ] {
+            let preset = crate::ui::sizing::Preset::for_window(size);
+            let scale = preset.scale();
             let mut view = app.view();
             let mut tree = Tree::new(&view);
             let node = view.as_widget_mut().layout(
@@ -1031,8 +1055,8 @@ mod tests {
                     &Event::Mouse(event),
                     Layout::new(&node),
                     mouse::Cursor::Available(iced::Point::new(
-                        620. * size.width / 700.,
-                        353. * size.height / 400.,
+                        (size.width - preset.size().width) / 2. + 620. * scale,
+                        (size.height - preset.size().height) / 2. + 353. * scale,
                     )),
                     &renderer,
                     &mut clipboard::Null,

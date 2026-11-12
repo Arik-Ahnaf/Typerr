@@ -20,8 +20,9 @@ fn control(
     active: bool,
     action: Option<Message>,
     opacity: f32,
+    scale: f32,
 ) -> Element<'static, Message> {
-    let glyph = icon(bytes, 20.0, 20.0)
+    let glyph = icon(bytes, 20.0 * scale, 20.0 * scale)
         .opacity(opacity)
         .style(move |_, _| svg::Style {
             color: Some(if active {
@@ -30,7 +31,7 @@ fn control(
                 theme::palette().pending
             }),
         });
-    button(container(glyph).center_x(35).center_y(30))
+    button(container(glyph).center_x(35. * scale).center_y(30. * scale))
         .padding(0)
         .on_press_maybe(action)
         .style(|_, _| button::Style::default())
@@ -41,12 +42,13 @@ fn group(
     left: Element<'static, Message>,
     right: Element<'static, Message>,
     opacity: f32,
+    scale: f32,
 ) -> Element<'static, Message> {
     container(row![left, right])
-        .padding([0, 5])
+        .padding([0., 5. * scale])
         .style(move |_| container::Style {
             background: Some(theme::alpha(theme::palette().control_background, opacity).into()),
-            border: iced::Border::default().rounded(8),
+            border: iced::Border::default().rounded(8. * scale),
             ..Default::default()
         })
         .into()
@@ -111,6 +113,7 @@ pub fn header(
     amount_picker: Option<Mode>,
     opacity: f32,
     enabled: bool,
+    scale: f32,
 ) -> Element<'static, Message> {
     let controls = row![
         group(
@@ -118,15 +121,18 @@ pub fn header(
                 include_bytes!("../../assets/icons/punctuation.svg"),
                 options.punctuation,
                 enabled.then_some(Message::TogglePunctuation),
-                opacity
+                opacity,
+                scale
             ),
             control(
                 include_bytes!("../../assets/icons/hash.svg"),
                 options.numbers,
                 enabled.then_some(Message::ToggleNumbers),
-                opacity
+                opacity,
+                scale
             ),
             opacity,
+            scale,
         ),
         group(
             mode_control(
@@ -134,28 +140,35 @@ pub fn header(
                 mode == Mode::Time,
                 Mode::Time,
                 opacity,
-                enabled
+                enabled,
+                scale
             ),
             mode_control(
                 include_bytes!("../../assets/icons/word-mode.svg"),
                 mode == Mode::Words,
                 Mode::Words,
                 opacity,
-                enabled
+                enabled,
+                scale
             ),
             opacity,
+            scale,
         ),
     ]
-    .spacing(10);
+    .spacing(10. * scale);
     let controls = container(controls)
-        .padding(iced::Padding::ZERO.top(30))
+        .padding(iced::Padding::ZERO.top(30. * scale))
         .center_x(Fill);
     let picker: Element<'static, Message> = match amount_picker.filter(|_| enabled) {
-        Some(mode) => container(amount_bar(mode))
+        Some(mode) => container(amount_bar(mode, scale))
             .padding(
                 iced::Padding::ZERO
-                    .top(65)
-                    .left(if mode == Mode::Words { 120 } else { 60 }),
+                    .top(65. * scale)
+                    .left(if mode == Mode::Words {
+                        120. * scale
+                    } else {
+                        60. * scale
+                    }),
             )
             .center_x(Fill)
             .into(),
@@ -163,9 +176,9 @@ pub fn header(
     };
     stack![controls, picker]
         .height(if enabled && amount_picker.is_some() {
-            95
+            95. * scale
         } else {
-            60
+            60. * scale
         })
         .into()
 }
@@ -176,12 +189,14 @@ fn mode_control(
     mode: Mode,
     opacity: f32,
     enabled: bool,
+    scale: f32,
 ) -> Element<'static, Message> {
     let control = control(
         bytes,
         active,
         enabled.then_some(Message::SelectMode(mode)),
         opacity,
+        scale,
     );
     if enabled {
         mouse_area(control)
@@ -192,7 +207,7 @@ fn mode_control(
     }
 }
 
-fn amount_bar(mode: Mode) -> Element<'static, Message> {
+fn amount_bar(mode: Mode, scale: f32) -> Element<'static, Message> {
     // Figma Words 103:10 / Times 7:65: 170 x 30, 8px corners,
     // 20px gaps between labels, with the final three-digit label wider.
     let choices = row(mode
@@ -204,11 +219,13 @@ fn amount_bar(mode: Mode) -> Element<'static, Message> {
                 container(
                     text(amount.to_string())
                         .font(theme::FONT)
-                        .size(16)
-                        .line_height(iced::widget::text::LineHeight::Absolute(20.0.into())),
+                        .size(16. * scale)
+                        .line_height(iced::widget::text::LineHeight::Absolute(
+                            (20. * scale).into(),
+                        )),
                 )
-                .center_x(if index == 3 { 49 } else { 40 })
-                .center_y(30),
+                .center_x(if index == 3 { 49. * scale } else { 40. * scale })
+                .center_y(30. * scale),
             )
             .padding(0)
             .on_press(Message::SelectAmount(mode, amount))
@@ -223,21 +240,26 @@ fn amount_bar(mode: Mode) -> Element<'static, Message> {
             .into()
         }));
     container(choices)
-        .center_x(170)
-        .height(30)
-        .style(|_| container::Style {
+        .center_x(170. * scale)
+        .height(30. * scale)
+        .style(move |_| container::Style {
             background: Some(theme::palette().control_background.into()),
-            border: iced::Border::default().rounded(8),
+            border: iced::Border::default().rounded(8. * scale),
             ..Default::default()
         })
         .into()
 }
 
-fn label(value: &'static str) -> iced::widget::Text<'static, iced::Theme, iced::Renderer> {
+fn label(
+    value: &'static str,
+    scale: f32,
+) -> iced::widget::Text<'static, iced::Theme, iced::Renderer> {
     text(value)
         .font(Font::with_name("Google Sans Code"))
-        .size(12)
-        .line_height(iced::widget::text::LineHeight::Absolute(15.0.into()))
+        .size(12. * scale)
+        .line_height(iced::widget::text::LineHeight::Absolute(
+            (15. * scale).into(),
+        ))
 }
 
 fn connection(
@@ -247,10 +269,11 @@ fn connection(
     url: &'static str,
     opacity: f32,
     enabled: bool,
+    scale: f32,
 ) -> Element<'static, Message> {
     button(
         row![
-            icon(bytes, width, 16.0)
+            icon(bytes, width * scale, 16.0 * scale)
                 .opacity(opacity)
                 .style(move |_, _| svg::Style {
                     color: Some(if name == "Github" {
@@ -259,9 +282,9 @@ fn connection(
                         theme::palette().blue
                     })
                 }),
-            label(name)
+            label(name, scale)
         ]
-        .spacing(5)
+        .spacing(5. * scale)
         .align_y(iced::Center),
     )
     .padding(0)
@@ -280,7 +303,7 @@ fn connection(
     .into()
 }
 
-pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
+pub fn footer(opacity: f32, enabled: bool, scale: f32) -> Element<'static, Message> {
     let links = row![
         connection(
             include_bytes!("../../assets/icons/github-logo.svg"),
@@ -288,7 +311,8 @@ pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
             "Github",
             "https://github.com/Arik-Ahnaf/Typerr",
             opacity,
-            enabled
+            enabled,
+            scale
         ),
         connection(
             include_bytes!("../../assets/icons/twitter-logo.svg"),
@@ -296,7 +320,8 @@ pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
             "Twitter",
             "https://x.com/ArikAhnaf1",
             opacity,
-            enabled
+            enabled,
+            scale
         ),
         connection(
             include_bytes!("../../assets/icons/discord-logo.svg"),
@@ -304,41 +329,47 @@ pub fn footer(opacity: f32, enabled: bool) -> Element<'static, Message> {
             "Discord",
             "https://discord.gg/FYehF2KCw4",
             opacity,
-            enabled
+            enabled,
+            scale
         ),
     ]
-    .spacing(10);
+    .spacing(10. * scale);
     let version = row![
         icon(
             include_bytes!("../../assets/icons/fa-branch.svg"),
-            12.0,
-            16.0
+            12.0 * scale,
+            16.0 * scale
         )
         .opacity(opacity)
         .style(|_, _| svg::Style {
             color: Some(theme::palette().orange)
         }),
-        label(concat!("V", env!("CARGO_PKG_VERSION")))
+        label(concat!("V", env!("CARGO_PKG_VERSION")), scale)
             .color(theme::alpha(theme::palette().correct, opacity))
     ]
-    .spacing(5)
+    .spacing(5. * scale)
     .align_y(iced::Center);
     let palette = row![
         icon(
             include_bytes!("../../assets/icons/fa-pallet.svg"),
-            16.0,
-            16.0
+            16.0 * scale,
+            16.0 * scale
         )
         .opacity(opacity)
         .style(|_, _| svg::Style {
             color: Some(theme::palette().orange)
         }),
-        label(theme::palette().name).color(theme::alpha(theme::palette().correct, opacity))
+        label(theme::palette().name, scale).color(theme::alpha(theme::palette().correct, opacity))
     ]
-    .spacing(5)
+    .spacing(5. * scale)
     .align_y(iced::Center);
-    container(row![links, Space::new().width(Fill), version, palette].spacing(10))
-        .padding(iced::Padding::ZERO.left(20).right(20).bottom(22))
+    container(row![links, Space::new().width(Fill), version, palette].spacing(10. * scale))
+        .padding(
+            iced::Padding::ZERO
+                .left(20. * scale)
+                .right(20. * scale)
+                .bottom(22. * scale),
+        )
         .width(Fill)
         .into()
 }

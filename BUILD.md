@@ -184,3 +184,22 @@ The existing settings path and writable user-directory fallback apply. Example:
 Words accepts 10/25/50/100; seconds accepts 15/30/60/120. Missing or unsupported
 fields use their defaults independently (Words, 50, 30, false, false). Invalid
 JSON is left untouched; save failures are reported to stderr and in Settings.
+
+
+## Window size presets
+
+Page elements keep fixed sizes within each logical window-size range. The
+original design sizes apply through 1000 × 500; larger presets require both
+axes to pass their thresholds:
+
+| Minimum window dimensions | Element size relative to the design |
+| --- | --- |
+| Default | 100% |
+| Width > 1000 and height > 500 | 125% |
+| 1400 × 800 | 150% |
+| 1800 × 1000 | 200% |
+
+The largest matching preset wins. Branding and account/greeting sizes remain
+fixed. Typing treats the configured font size as its base and can use a smaller
+preset when needed to preserve all four rows. Resizing never saves font values
+or resets a test. These thresholds use logical pixels, independently of OS DPI.

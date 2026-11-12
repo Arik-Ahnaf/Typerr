@@ -4,6 +4,7 @@ pub mod dashboard;
 pub mod page_host;
 pub mod score;
 pub mod settings_page;
+pub mod sizing;
 pub mod theme;
 pub mod typing_panel;
 pub mod update_prompt;

@@ -281,7 +281,7 @@ struct Scale {
     text: f32,
 }
 impl Scale {
-    // Branding is fixed, so the search should not drift down with window height.
+    // Search grows more gently than the body, with a fixed size in each preset.
     fn search_scale(self) -> f32 {
         (1. + (self.text - 1.) * 0.25).clamp(1., 1.25)
     }
@@ -295,8 +295,8 @@ impl Scale {
         self.panel_height() - SAVE_ROW_HEIGHT * self.y
     }
     fn new(size: Size) -> Self {
-        let x = size.width / 700.;
-        let y = size.height / 400.;
+        let x = super::sizing::Preset::for_window(size).scale();
+        let y = x;
         Self {
             x,
             y,
@@ -620,7 +620,14 @@ pub fn view(state: &State) -> Element<'_, Message> {
             .on_press(Message::BackToTyping)
             .style(|_, _| button::Style::default());
         stack![
-            container(body).padding(Padding::ZERO.left(30. * scale.x).top(80.)),
+            container(
+                container(body)
+                    .padding(Padding::ZERO.left(30. * scale.x).top(80.))
+                    .width(700. * scale.x)
+                    .height(400. * scale.y)
+            )
+            .center_x(Fill)
+            .center_y(Fill),
             chrome::brand(),
             container(home).padding(Padding::ZERO.left(50).top(30)),
         ]

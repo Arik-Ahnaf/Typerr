@@ -98,7 +98,7 @@ Before delivery, review all acceptance criteria, architecture boundaries, test r
 
 ## Score page and crossfade
 
-Figma Score frame `59:3` and graph template `94:66`, plus the two corresponding PNG references, define the score UI. Uniformly scale the 700 × 400 reference composition by the smaller window-axis ratio and center it in the available space. Scale graph geometry/clipping, text, icons, and Next/Retry hit targets together. Common branding and the account button stay at their existing fixed sizes and window positions throughout the fade. Score typography is independent of typing `font-size`. Hide typing controls/footer on Score. Replace the green placeholder with a transparent native Canvas plot, reserving the right edge for the Errors axis. Use Google Sans Code and existing centralized theme colors; use the supplied `next.svg` (12 × 20) and `restart.svg` (25 × 25) inside separate 36 × 40 Next/Retry buttons at reference size. The numbers toggle uses `hash.svg` (20 × 20).
+Figma Score frame `59:3` and graph template `94:66`, plus the two corresponding PNG references, define the score UI. Use the shared discrete window-size preset for the 700 × 400 reference composition and center it in the available space. Scale graph geometry/clipping, text, icons, and Next/Retry hit targets together. Common branding and the account button stay at their existing fixed sizes and window positions throughout the fade. Score typography is independent of typing `font-size`. Hide typing controls/footer on Score. Replace the green placeholder with a transparent native Canvas plot, reserving the right edge for the Errors axis. Use Google Sans Code and existing centralized theme colors; use the supplied `next.svg` (12 × 20) and `restart.svg` (25 × 25) inside separate 36 × 40 Next/Retry buttons at reference size. The numbers toggle uses `hash.svg` (20 × 20).
 
 `Score` in `src/statistics.rs` is the completed-session source of truth. Start monotonic timing on the first accepted printable scalar in either mode, keep idle/unfocused time, and freeze at the completion character or exact Time deadline (before the fade). WPM = retained correct scalars / 5 / elapsed minutes; Raw = all retained scalars / 5 / elapsed minutes, displayed as WPM rather than a percentage. Include spaces, punctuation, and numbers. Backspace removes the deleted scalar from these retained counts. Accuracy = correct printable attempts / all printable attempts * 100; deleting mistakes does not erase their accuracy/error history, and Backspace/control/shortcut/no-op events are not attempts. Consistency = clamp(100 * (1 - population standard deviation / mean), 0, 100) of attempted characters/second over one-second intervals, including idle intervals; weight the final partial interval by its duration. The first interval includes time zero and all intervals include their right endpoint. A single interval has 100% consistency; zero elapsed time has zero speeds/consistency and an empty graph, avoiding division by zero. Every session replacement clears all measurements.
 
@@ -144,13 +144,13 @@ and Windows cross-build checks when changing storage dependencies.
 ## Dashboard — 2026-11-04
 
 Figma `86:50` and `design_references/Dashboard Page.png` define the
-700 × 400 reference layout. Dashboard fills the available window, up to the
-entire screen: scale card/chart geometry and positions with each window axis,
-and scale body text and profile artwork uniformly by the smaller ratio.
+700 × 400 reference layout. Dashboard uses the shared discrete window-size
+preset for its card/chart geometry, body text, and profile artwork; center
+that fixed-size body in the available window.
 Keep the avatar circular. Header branding stays at its original fixed size,
 50px from the left and 30px from the top, with a fixed 124 × 40 Home hit target.
 The greeting stays 20px at top=37/right=70. Neither header element scales.
-Do not cap Dashboard at 700 × 400 or add outer centering margins. The pink 610 × 100 area at (45, 287) is only chart placement; the centered 500 × 2 foreground rule at (100, 275) is visible chart chrome. The four cards begin at x=45/355. Use the renderer-measured top heading as the fixed left anchor for both headings and values in each lifetime-summary column; keep best-result columns centered. Render a transparent native Canvas histogram from `All time wpm bar chart.png`.
+Grow the body only at preset boundaries, rather than continuously stretching it. The pink 610 × 100 area at (45, 287) is only chart placement; the centered 500 × 2 foreground rule at (100, 275) is visible chart chrome. The four cards begin at x=45/355. Use the renderer-measured top heading as the fixed left anchor for both headings and values in each lifetime-summary column; keep best-result columns centered. Render a transparent native Canvas histogram from `All time wpm bar chart.png`.
 Reuse the shared brand and compiled palette. Bundle the supplied default profile JPEG and existing Google Sans Code Italic/Medium/SemiBold/Light font faces with
 OFL coverage. The profile name and greeting use the saved name; title and joined date remain hardcoded.
 Dashboard typography is independent of typing font settings.
@@ -264,8 +264,8 @@ fresh test with remembered mode, amounts, and generation options. Ctrl+, while
 already on Settings preserves the current view. Tab/Shift+Tab traverses settings
 fields and must never restart the underlying typing session.
 
-Keep branding fixed at (50, 30). Scale body geometry by each window axis and
-fonts/control contents uniformly by the smaller ratio. At the reference size,
+Keep branding fixed at (50, 30). Use the shared discrete window-size preset
+for body geometry and fonts/control contents, centering the resulting body. At the reference size,
 search is (30, 80, 640, 40), categories are (30, 130, 90, 160), and the options
 viewport is (130, 130, 540, 250). Only the options panel scrolls. General, Caret,
 Theme, Sound category clicks clear search and scroll their section heading to
@@ -297,9 +297,8 @@ never overwrite malformed JSON, including an existing fallback. Show Saved only
 after a successful write; show retryable errors without leaving the page or
 losing drafts. No live preference application is authorized by this follow-up.
 
-The Settings search stays at y=80 as the window grows. Its scale is
-clamp(1 + (min(width/700, height/400) - 1) * 0.25, 1, 1.25), yielding 40–50px
-height and 16–20px text. Keep its width aligned with the body panels. Place the
+The Settings search stays at y=80 within its centered preset composition.
+Its four preset sizes use 16/17/18/20px text and 40/42.5/45/50px height. Keep its width aligned with the body panels. Place the
 panels directly below it with a 10px gap scaled by that same search factor;
 expand the options panel to retain its original scaled bottom margin. Category
 scroll targets still use the body vertical scale, independently of viewport
@@ -345,3 +344,35 @@ Missing/invalid fields individually fall back to Words, 50 words, 30 seconds,
 and disabled toggles. Settings Save preserves the course. Packaging strips the
 builder's course alongside the name. Mode and allowed amounts now live in
 settings.rs and are re-exported from app.rs for native controls.
+
+
+## Discrete page sizing — 2026-11-12
+
+This follow-up supersedes earlier continuous window-ratio sizing, Dashboard
+stretching, the 700px typing-panel cap, and image-editor fit-to-window sizing.
+`src/ui/sizing.rs` selects the largest preset whose width AND height thresholds
+are met, using logical pixels (OS display scaling remains independent):
+
+| Preset | Window threshold | Reference composition | Design font 16px |
+| --- | --- | --- | --- |
+| Design | Otherwise, including 700 × 400 through 1000 × 500 | 700 × 400 | 16px |
+| Medium | Width > 1000 and height > 500 | 875 × 500 | 20px |
+| Large | Width >= 1400 and height >= 800 | 1050 × 600 | 24px |
+| Extra large | Width >= 1800 and height >= 1000 | 1400 × 800 | 32px |
+
+Within a preset, typography, artwork, padding, controls, and hit targets keep
+fixed sizes; positioning may follow the window. Wide/short and narrow/tall
+windows use the largest preset that fits both axes. Score, Dashboard, and
+Settings center their preset compositions. Shared branding/account/greeting
+and Home hit targets retain fixed header geometry. Settings retains its gentler
+search sizes, explicit Save behavior, scroll/focus handling, and draft values.
+
+Typing uses a 640/800/960/1280px panel and preset-sized mode controls, amount
+menus, footer, counter, padding, and caret. The configured font size is the
+base size; only its presentation changes, never settings.json. Use a smaller
+preset if a large configured font needs it to retain four full rows and scaled
+125px vertical clearance. Resizing preserves session/progress/timing, restores
+active-line following, and snaps the caret; font metrics still come from the
+renderer. The image editor uses 200 × 230, 250 × 287.5, 300 × 345, or 400 × 460
+cards with matching hit/crop geometry and room for errors. Name and updater
+modals retain their existing fixed dimensions.

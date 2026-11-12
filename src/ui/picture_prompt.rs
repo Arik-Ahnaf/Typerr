@@ -14,10 +14,16 @@ use iced::{
 };
 
 fn modal_scale(size: Size, has_error: bool) -> f32 {
+    let requested = super::sizing::Preset::for_window(size).scale();
     let height = if has_error { 290. } else { 230. };
-    ((size.width - 32.).max(1.) / 200.)
-        .min((size.height - 32.).max(1.) / height)
-        .min(2.)
+    [2., 1.5, 1.25, 1.]
+        .into_iter()
+        .find(|scale| {
+            *scale <= requested
+                && 200. * scale <= size.width - 32.
+                && height * scale <= size.height - 32.
+        })
+        .unwrap_or(1.)
 }
 
 pub fn avatar(handle: &iced::widget::image::Handle, size: f32) -> Element<'_, Message> {

@@ -1,4 +1,4 @@
-use super::{caret::Caret, theme};
+use super::{caret::Caret, sizing::Preset, theme};
 use crate::settings::CaretStyle;
 use iced::advanced::Renderer as _;
 use iced::advanced::text::{Paragraph, Renderer as _};
@@ -22,6 +22,7 @@ pub struct TypingPanel<'a> {
     opacity: f32,
     interactive: bool,
     settings: crate::settings::Settings,
+    preset: Preset,
 }
 
 #[derive(Default)]
@@ -37,6 +38,7 @@ struct State {
     unfocused: bool,
     wheel_remainder: f32,
     font_size: f32,
+    preset: Preset,
 }
 
 impl State {
@@ -44,12 +46,12 @@ impl State {
         let measured = self.layout.as_ref().expect("layout was initialized");
         let offset = self.viewport.content_origin(
             measured,
-            (self.size.width - 2.0 * theme::INSET).max(0.0),
-            (self.size.height - 2.0 * theme::VERTICAL_INSET).max(0.0),
+            (self.size.width - 2.0 * (theme::INSET * self.preset.scale())).max(0.0),
+            (self.size.height - 2.0 * (theme::VERTICAL_INSET * self.preset.scale())).max(0.0),
         );
         CaretTarget {
-            x: theme::INSET + offset.x,
-            y: theme::VERTICAL_INSET + offset.y,
+            x: (theme::INSET * self.preset.scale()) + offset.x,
+            y: (theme::VERTICAL_INSET * self.preset.scale()) + offset.y,
         }
     }
 
@@ -142,7 +144,14 @@ impl<'a> TypingPanel<'a> {
             opacity: 1.0,
             interactive: true,
             settings,
+            preset: Preset::Design,
         }
+    }
+
+    pub fn preset(mut self, preset: Preset) -> Self {
+        self.preset = preset;
+        self.settings.font_size *= preset.scale();
+        self
     }
 
     pub fn presentation(mut self, opacity: f32, interactive: bool) -> Self {
@@ -209,7 +218,8 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
             || state.size != size
             || state.target != self.session.target()
             || state.generation != self.generation
-            || state.font_size != self.settings.font_size;
+            || state.font_size != self.settings.font_size
+            || state.preset != self.preset;
         if resized {
             // Query the renderer's paragraph implementation after startup font registration.
             // A single monospaced ASCII glyph has the same advance as each target cell.
@@ -221,19 +231,20 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
             let advance = metrics.min_width();
             let measured = TextLayout::new(
                 self.session.target(),
-                (size.width - 2.0 * theme::INSET).max(0.0),
+                (size.width - 2.0 * (theme::INSET * self.preset.scale())).max(0.0),
                 advance,
                 self.settings.line_height(),
             );
             state.viewport.resize(
                 &measured,
-                size.height - 2.0 * theme::VERTICAL_INSET,
+                size.height - 2.0 * (theme::VERTICAL_INSET * self.preset.scale()),
                 self.session.position(),
             );
             state.layout = Some(measured);
             state.target = self.session.target().to_vec();
             state.size = size;
             state.font_size = self.settings.font_size;
+            state.preset = self.preset;
         }
         state.sync_caret(
             self.session.position(),
@@ -298,8 +309,9 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
         let Some(measured) = &state.layout else {
             return;
         };
-        let inner_width = (bounds.width - 2.0 * theme::INSET).max(0.0);
-        let inner_height = (bounds.height - 2.0 * theme::VERTICAL_INSET).max(0.0);
+        let inner_width = (bounds.width - 2.0 * (theme::INSET * self.preset.scale())).max(0.0);
+        let inner_height =
+            (bounds.height - 2.0 * (theme::VERTICAL_INSET * self.preset.scale())).max(0.0);
         let offset = state.content_origin();
         let origin = Point::new(bounds.x + offset.x, bounds.y + offset.y);
         // Keep the monitor aligned with the measured, centered text block,
@@ -307,18 +319,21 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
         renderer.fill_text(
             text_definition(
                 &self.monitor,
-                Size::new(inner_width, theme::LINE_HEIGHT),
-                crate::settings::Settings::default(),
+                Size::new(inner_width, theme::LINE_HEIGHT * self.preset.scale()),
+                crate::settings::Settings {
+                    font_size: 16. * self.preset.scale(),
+                    ..Default::default()
+                },
             )
             .with_content(self.monitor.clone()),
-            Point::new(origin.x, origin.y - 30.0),
+            Point::new(origin.x, origin.y - 30.0 * self.preset.scale()),
             theme::alpha(theme::palette().blue, self.opacity),
             *_viewport,
         );
         let clip = Rectangle {
             x: origin.x,
             y: origin.y,
-            width: (bounds.width - theme::INSET - offset.x).max(0.0),
+            width: (bounds.width - (theme::INSET * self.preset.scale()) - offset.x).max(0.0),
             height: state.viewport.visible_lines(measured.lines.len()).len() as f32
                 * self.settings.line_height(),
         };
@@ -350,9 +365,10 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
                                 renderer::Quad {
                                     bounds: Rectangle {
                                         x,
-                                        y: y + self.settings.line_height() - 3.0,
+                                        y: y + self.settings.line_height()
+                                            - 3.0 * self.preset.scale(),
                                         width: measured.advance,
-                                        height: 2.0,
+                                        height: 2.0 * self.preset.scale(),
                                     },
                                     ..Default::default()
                                 },
@@ -383,8 +399,8 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
             // Retain the whole padded panel during a return movement, even if
             // the newly centered text block is narrower than the previous one.
             let caret_clip = Rectangle {
-                x: bounds.x + theme::INSET,
-                y: bounds.y + theme::VERTICAL_INSET,
+                x: bounds.x + (theme::INSET * self.preset.scale()),
+                y: bounds.y + (theme::VERTICAL_INSET * self.preset.scale()),
                 width: inner_width,
                 height: inner_height,
             };
@@ -397,17 +413,17 @@ impl<Message> Widget<Message, Theme, Renderer> for TypingPanel<'_> {
                             y: bounds.y
                                 + caret.y
                                 + if self.settings.caret_style == CaretStyle::Underline {
-                                    self.settings.line_height() - 2.0
+                                    self.settings.line_height() - 2.0 * self.preset.scale()
                                 } else {
                                     0.0
                                 },
                             width: if self.settings.caret_style == CaretStyle::Line {
-                                2.0
+                                2.0 * self.preset.scale()
                             } else {
                                 measured.advance
                             },
                             height: if self.settings.caret_style == CaretStyle::Underline {
-                                2.0
+                                2.0 * self.preset.scale()
                             } else {
                                 self.settings.line_height()
                             },
@@ -582,6 +598,64 @@ mod tests {
     }
 
     const MOVEMENT: Duration = Duration::from_millis(100);
+
+    #[test]
+    fn preset_changes_keep_four_rows_and_follow_the_same_logical_position() {
+        let renderer = iced::futures::executor::block_on(
+            <Renderer as iced::advanced::renderer::Headless>::new(
+                theme::FONT,
+                16.into(),
+                Some("tiny-skia"),
+            ),
+        )
+        .unwrap();
+        let mut session = TypingSession::new(
+            std::iter::repeat_n("sample", 500)
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
+        for _ in 0..110 {
+            session.input('x');
+        }
+        for font_size in [8., 16., 16.5, 24., 48.] {
+            let settings = crate::settings::Settings {
+                font_size,
+                ..Default::default()
+            };
+            let mut tree = tree::Tree::empty();
+            for preset in [
+                Preset::Design,
+                Preset::Medium,
+                Preset::Large,
+                Preset::ExtraLarge,
+                Preset::Design,
+            ] {
+                let mut panel =
+                    TypingPanel::new(&session, 110, 0, "0/50".into(), settings).preset(preset);
+                let widget: &dyn Widget<(), Theme, Renderer> = &panel;
+                tree.diff(widget);
+                let size = Size::new(
+                    640. * preset.scale(),
+                    (theme::typing_height(settings.line_height()) * preset.scale()).ceil(),
+                );
+                <TypingPanel<'_> as Widget<(), Theme, Renderer>>::layout(
+                    &mut panel,
+                    &mut tree,
+                    &renderer,
+                    &layout::Limits::new(size, size),
+                );
+                let state = tree.state.downcast_ref::<State>();
+                let measured = state.layout.as_ref().unwrap();
+                assert_eq!(state.viewport.visible_lines(measured.lines.len()).len(), 4);
+                assert_eq!(
+                    state.viewport.top_line,
+                    measured.active_line(session.position())
+                );
+                assert_eq!(state.caret.rendered, state.caret_target(session.position()));
+                assert_eq!(session.position(), 110);
+            }
+        }
+    }
 
     fn geometry(state: &mut State, session: &TypingSession, size: Size, font_size: f32) {
         // Synthetic measured metrics; production still obtains these from Iced.
