@@ -376,3 +376,12 @@ active-line following, and snaps the caret; font metrics still come from the
 renderer. The image editor uses 200 × 230, 250 × 287.5, 300 × 345, or 400 × 460
 cards with matching hit/crop geometry and room for errors. Name and updater
 modals retain their existing fixed dimensions.
+
+## Average-WPM profile title — 2026-11-12
+
+The Dashboard title now derives from lifetime average WPM, superseding the
+hardcoded title: below 40 Novice, 40–59 Keybound, 60–79 Clicksmith,
+80–99 Swiftstroke, 100–119 Velocity, 120–139 Afterimage, 140–159 Ghostwriter,
+and 160+ Machina. Compare full-precision averages against the lower thresholds.
+Empty history starts at Novice; pending/failed history shows N/A. Reuse the
+existing Dashboard snapshot without saving a separate title or changing SQL.

@@ -22,8 +22,8 @@ from Cargo config before running it.
 
 Outputs for the current `Cargo.toml` version:
 
-- `dist/typerr-2.0.0-arch-linux-x86_64.tar.gz`
-- `dist/typerr-2.0.0-1-x86_64.pkg.tar.zst`
+- `dist/typerr-2.1.0-arch-linux-x86_64.tar.gz`
+- `dist/typerr-2.1.0-1-x86_64.pkg.tar.zst`
 - `dist/SHA256SUMS`
 
 Check downloaded/copied artifacts with:
@@ -44,14 +44,14 @@ replaces matching distribution filenames only after both formats build.
 Portable archive:
 
 ```sh
-tar -xzf dist/typerr-2.0.0-arch-linux-x86_64.tar.gz
-./typerr-2.0.0-arch-linux-x86_64/typerr
+tar -xzf dist/typerr-2.1.0-arch-linux-x86_64.tar.gz
+./typerr-2.1.0-arch-linux-x86_64/typerr
 ```
 
 Pacman package (optional; packaging does not run this):
 
 ```sh
-sudo pacman -U dist/typerr-2.0.0-1-x86_64.pkg.tar.zst
+sudo pacman -U dist/typerr-2.1.0-1-x86_64.pkg.tar.zst
 typerr
 ```
 
@@ -106,7 +106,7 @@ bash packaging/build-windows.sh
 ```
 
 This cross-compiles the MSVC release, checks the x64 PE GUI subsystem and
-runtime imports, and creates `dist/typerr-2.0.0-windows-x86_64.zip`.
+runtime imports, and creates `dist/typerr-2.1.0-windows-x86_64.zip`.
 Extract the whole ZIP on Windows and open `typerr.exe`. The ZIP contains the
 current settings (24px), usage instructions, and Windows dependency/font/Rust
 notices. The executable includes the supplied logo at multiple icon sizes for
@@ -126,7 +126,7 @@ Create the Windows installer from that same ZIP payload:
 bash packaging/build-windows-installer.sh
 ```
 
-The resulting `dist/typerr-2.0.0-setup.exe` installs for the current user under
+The resulting `dist/typerr-2.1.0-setup.exe` installs for the current user under
 Local AppData Programs, creates Start Menu and desktop shortcuts, and registers
 an uninstaller. Reinstalling preserves an existing adjacent `settings.json`;
 uninstalling also leaves it in place. The installer is unsigned. See BUILD.md
@@ -134,8 +134,8 @@ for the supported local NSIS tool discovery.
 
 ## Updater release contract
 
-Build/package version 2.0.0 and later with the matching `v<version>` GitHub tag.
-Set `TYPERR_RELEASE_TAG=v2.0.0` while packaging to enforce the intended tag.
+Build/package version 2.1.0 and later with the matching `v<version>` GitHub tag.
+Set `TYPERR_RELEASE_TAG=v2.1.0` while packaging to enforce the intended tag.
 Native packaging executes `typerr --version`; Windows PE version resources are
 generated from Cargo's package version. Never reuse the historical v1.0.0 /
 0.1.0 mismatch. Keep all platform assets and `SHA256SUMS` attached to the same

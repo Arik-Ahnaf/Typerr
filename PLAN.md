@@ -1199,3 +1199,31 @@ Validation:
   physical pointer interaction, and native Windows/Wayland validation remain
   unverified and recommended. No dependencies, persistence schema changes,
   packages, push, or publication.
+
+## Average-WPM profile title — 2026-11-12
+
+- Replaced the Dashboard's fixed Professional Typist title with the supplied
+  ranks based on the existing lifetime average WPM: Novice below 40, Keybound
+  from 40, Clicksmith from 60, Swiftstroke from 80, Velocity from 100,
+  Afterimage from 120, Ghostwriter from 140, and Machina from 160.
+  Full-precision averages determine thresholds. Empty history starts at Novice;
+  pending/failed history shows N/A. The title refreshes with each Dashboard
+  snapshot; no stored title, schema change, dependency, or new query is needed.
+- Validation: formatting, strict all-target Clippy, all 138 tests, locked debug
+  and release builds with CARGO_BUILD_JOBS=2, and git diff --check pass.
+  Boundary tests cover fractional values just below and exactly at each rank.
+- No GUI launch or screenshot inspection was performed for this text change;
+  native Windows/Wayland verification remains outstanding. No push or release.
+
+
+## Local 2.1.0 builds — 2026-11-12
+
+Updated Cargo version and current build/package examples to 2.1.0. Built the
+current working tree, including the pending Dashboard title change, as Arch
+portable/pacman and Windows MSVC portable/NSIS installer packages. Formatting,
+strict native and Windows Clippy, all 138 tests, locked native debug/release
+builds and Windows release cross-build passed with two Cargo jobs. ZIP integrity,
+installer executable equality, and distribution checksums passed. Evidence:
+`target/packaging/arch.1yysNM/` and `target/packaging/windows.BJw2dM/`.
+Previous distribution files were retained. No commit, push, or release was made.
+GUI interaction and native Windows execution were not tested; installer unsigned.

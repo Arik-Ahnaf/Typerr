@@ -65,6 +65,22 @@ fn metric(value: Option<f64>, percent: bool) -> String {
     )
 }
 
+fn rank(average_wpm: Option<f64>) -> &'static str {
+    let Some(wpm) = average_wpm else {
+        return NA;
+    };
+    match wpm {
+        w if w < 40. => "Novice",
+        w if w < 60. => "Keybound",
+        w if w < 80. => "Clicksmith",
+        w if w < 100. => "Swiftstroke",
+        w if w < 120. => "Velocity",
+        w if w < 140. => "Afterimage",
+        w if w < 160. => "Ghostwriter",
+        _ => "Machina",
+    }
+}
+
 fn duration(seconds: f64) -> String {
     if seconds < 60. {
         return format!("{seconds:.0}s");
@@ -268,7 +284,18 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
                 fitted_size(self.name, theme::SEMIBOLD_FONT, 20., 190.),
                 theme::SEMIBOLD_FONT,
             ),
-            ("Professional Typist", 122., 14., theme::ITALIC_FONT),
+            (
+                rank(self.data.and_then(|data| {
+                    if data.summary.completed_tests == 0 {
+                        Some(0.)
+                    } else {
+                        data.summary.average_wpm
+                    }
+                })),
+                122.,
+                14.,
+                theme::ITALIC_FONT,
+            ),
             ("Joined 4th January, 2026", 140., 10., theme::FONT),
         ] {
             scaled_text(
@@ -463,6 +490,25 @@ pub fn view<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ranks_use_full_precision_average_at_each_boundary() {
+        assert_eq!(rank(None), "N/A");
+        assert_eq!(rank(Some(0.)), "Novice");
+        for (threshold, below, at) in [
+            (40., "Novice", "Keybound"),
+            (60., "Keybound", "Clicksmith"),
+            (80., "Clicksmith", "Swiftstroke"),
+            (100., "Swiftstroke", "Velocity"),
+            (120., "Velocity", "Afterimage"),
+            (140., "Afterimage", "Ghostwriter"),
+            (160., "Ghostwriter", "Machina"),
+        ] {
+            assert_eq!(rank(Some(threshold - 0.01)), below);
+            assert_eq!(rank(Some(threshold)), at);
+        }
+        assert_eq!(rank(Some(500.)), "Machina");
+    }
+
     #[test]
     fn missing_metrics_differ_from_measured_zero() {
         assert_eq!(metric(None, false), "N/A");

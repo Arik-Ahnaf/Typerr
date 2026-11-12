@@ -82,7 +82,7 @@ This checkout also has project-local tools under `target/windows-tools/`, which
 the script detects automatically; setup is unnecessary while those remain available.
 
 Outputs: `target/x86_64-pc-windows-msvc/release/typerr.exe` and
-`dist/typerr-2.0.0-windows-x86_64.zip`, plus updated `dist/SHA256SUMS`.
+`dist/typerr-2.1.0-windows-x86_64.zip`, plus updated `dist/SHA256SUMS`.
 The static-runtime flags apply only to the Windows target. No Wine or GitHub
 Actions is needed to build. Test the extracted application on Windows before
 claiming native Windows runtime support.
