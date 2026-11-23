@@ -73,6 +73,11 @@ temporary directories or in-memory stores, never the default user database.
 - `distribution.sql`: parameterized WPM-range counts over all completed tests,
   including zero WPM. Dashboard chooses twelve ranges with a minimum width of
   ten WPM, widening in multiples of ten when needed.
+- `activity.sql`: last twelve calendar months through the reference UTC day,
+  with leap-year handling and zero-filled dates. Counts use the existing
+  completion-time index and exclude older/future days. `dashboard_at(now_ms)`
+  injects the reference time for tests; `dashboard()` reads the system clock on
+  the worker. Each `ActivityDay` contains its Unix day, ISO date, and test count.
 
 Schema constraints enforce nonnegative finite metrics/durations, percentages in
 0–100, positive amounts, valid modes, required fields, and boolean option flags.
@@ -81,8 +86,9 @@ Completion-order and mode/amount/ranking indexes support the read queries.
 
 `ScoreWriter::dashboard` queues a read after prior saves and returns a receiver.
 The GUI polls without blocking, only while a reply is pending. `ScoreStore::dashboard`
-returns summary, bests, and histogram in one read transaction; it does not load
-all history records or open another connection. Reads do not change the schema.
+returns summary, bests, histogram, and daily activity in one read transaction;
+it does not load all history records or open another connection. Reads do not change the schema.
 A failed query is logged to stderr and the existing local log. Dashboard renders
-N/A for unavailable/empty data and refreshes on each opening. Profile editing,
+N/A for unavailable metrics and refreshes on each opening. Empty history shows
+zero activity counts and an empty histogram. Profile editing,
 profile persistence, and historical per-test Score graphs remain excluded.

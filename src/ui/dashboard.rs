@@ -1,14 +1,20 @@
-//! Figma Dashboard 86:50, using completed-test history and a native histogram.
+//! Figma Dashboard 86:50: fixed header above a 589px scrollable composition.
+mod charts;
+#[cfg(test)]
+mod scroll_tests;
 use super::chrome::fitted_size;
 use super::{chrome, theme};
 use crate::app::Message;
 use canvas::{Frame, Path, Stroke, Text};
 use iced::advanced::text::{self as native_text, Paragraph};
-use iced::widget::{button, canvas, container, responsive, stack, text, tooltip};
+use iced::widget::{button, canvas, container, responsive, scrollable, stack, text, tooltip};
 use iced::{Element, Font, Point, Rectangle, Renderer, Size, Theme, Vector, mouse};
 use typerr::storage::{DashboardData, TestMode};
 
 const NA: &str = "N/A";
+const HEADER_HEIGHT: f32 = 75.;
+const DESIGN_HEIGHT: f32 = 589.;
+const BODY_HEIGHT: f32 = DESIGN_HEIGHT - HEADER_HEIGHT;
 
 /// Scale the fixed preset surface; keep glyphs and artwork undistorted.
 #[derive(Clone, Copy)]
@@ -20,7 +26,7 @@ impl Scale {
     fn new(size: Size) -> Self {
         Self {
             x: (size.width / 700.).max(0.001),
-            y: (size.height / 400.).max(0.001),
+            y: (size.height / BODY_HEIGHT).max(0.001),
         }
     }
     fn content(self) -> f32 {
@@ -166,106 +172,42 @@ struct DashboardCanvas<'a> {
     name: &'a str,
     data: Option<&'a DashboardData>,
 }
-impl DashboardCanvas<'_> {
-    fn chart(&self, frame: &mut Frame) {
-        // The pink rectangle in the design is placement guidance only.
-        frame.stroke(
-            &Path::line(Point::new(100., 275.), Point::new(600., 275.)),
-            Stroke::default()
-                .with_color(theme::palette().correct)
-                .with_width(2.),
-        );
-        let plot = Rectangle {
-            x: 79.,
-            y: 280.,
-            width: 574.,
-            height: 72.,
-        };
-        rotated(frame, "Tests", Point::new(42., 333.), 10., theme::FONT);
-        let data = self.data.filter(|data| data.summary.completed_tests > 0);
-        let peak = data.map_or(0, |data| *data.bins.iter().max().unwrap());
-        let step = ((peak as f64 / 4.).ceil() as u64).max(1);
-        let maximum = step as f64 * 4.;
-        for tick in 0..=4 {
-            let y = plot.y + plot.height * (1. - tick as f32 / 4.);
-            frame.stroke(
-                &Path::line(Point::new(plot.x, y), Point::new(plot.x + plot.width, y)),
-                Stroke::default()
-                    .with_color(theme::palette().control_background)
-                    .with_width(0.5),
-            );
-            if data.is_some() {
-                label(
-                    frame,
-                    &metric(Some(tick as f64 * step as f64), false),
-                    Rectangle {
-                        x: 49.,
-                        y: y - 6.,
-                        width: 26.,
-                        height: 12.,
-                    },
-                    9.,
-                    theme::FONT,
-                );
-            }
-        }
-        if let Some(data) = data {
-            let cell = plot.width / 12.;
-            for (i, count) in data.bins.iter().enumerate() {
-                let x = plot.x + cell * i as f32;
-                let h = (*count as f64 / maximum) as f32 * plot.height;
-                if *count > 0 {
-                    frame.fill_rectangle(
-                        Point::new(x + cell * 0.14, plot.y + plot.height - h),
-                        Size::new(cell * 0.72, h),
-                        theme::palette().blue,
-                    );
-                }
-                let low = i as f64 * data.bin_width;
-                let high = (i + 1) as f64 * data.bin_width - 1.;
-                let range = format!("{}–{}", metric(Some(low), false), metric(Some(high), false));
-                label(
-                    frame,
-                    &range,
-                    Rectangle {
-                        x,
-                        y: 356.,
-                        width: cell - 3.,
-                        height: 14.,
-                    },
-                    9.,
-                    theme::FONT,
-                );
-            }
-        } else {
-            label(
-                frame,
-                NA,
-                Rectangle {
-                    x: plot.x,
-                    y: 305.,
-                    width: plot.width,
-                    height: 25.,
-                },
-                16.,
-                theme::FONT,
-            );
-        }
-    }
-}
-
 impl canvas::Program<Message> for DashboardCanvas<'_> {
-    type State = ();
+    type State = Option<Point>;
+
+    fn update(
+        &self,
+        state: &mut Self::State,
+        event: &iced::Event,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+    ) -> Option<canvas::Action<Message>> {
+        if matches!(
+            event,
+            iced::Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft)
+                | iced::Event::Window(iced::window::Event::RedrawRequested(_))
+        ) {
+            let position = cursor.position_in(bounds);
+            if *state != position {
+                *state = position;
+                return Some(canvas::Action::request_redraw());
+            }
+        }
+        None
+    }
+
     fn draw(
         &self,
-        _: &(),
+        _: &Self::State,
         renderer: &Renderer,
         _: &Theme,
         bounds: Rectangle,
-        _: mouse::Cursor,
+        cursor: mouse::Cursor,
     ) -> Vec<canvas::Geometry> {
         let mut frame = Frame::new(renderer, bounds.size());
-        frame.scale_nonuniform(Scale::new(bounds.size()).vector());
+        let scale = Scale::new(bounds.size());
+        frame.scale_nonuniform(scale.vector());
+        frame.translate(Vector::new(0., -HEADER_HEIGHT));
         for (x, y, h) in [
             (45., 75., 100.),
             (355., 75., 100.),
@@ -423,7 +365,16 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
                 }
             }
         }
-        self.chart(&mut frame);
+        frame.stroke(
+            &Path::line(Point::new(100., 275.), Point::new(600., 275.)),
+            Stroke::default()
+                .with_color(theme::palette().correct)
+                .with_width(2.),
+        );
+        let pointer = cursor
+            .position_in(bounds)
+            .map(|p| Point::new(p.x / scale.x, p.y / scale.y + HEADER_HEIGHT));
+        charts::draw(&mut frame, self.data, pointer);
         vec![frame.into_geometry()]
     }
 }
@@ -434,7 +385,8 @@ pub fn view<'a>(
     avatar: &'a iced::widget::image::Handle,
 ) -> Element<'a, Message> {
     responsive(move |size| {
-        let preset_size = super::sizing::Preset::for_window(size).size();
+        let factor = super::sizing::Preset::for_window(size).scale();
+        let preset_size = Size::new(700. * factor, BODY_HEIGHT * factor);
         let scale = Scale::new(preset_size);
         let content = scale.content();
         let avatar_center = scale.point(Point::new(95., 125.));
@@ -444,18 +396,23 @@ pub fn view<'a>(
             &greeting_text,
             theme::USER_FONT,
             20.,
-            (size.width - 260.).max(1.),
+            (size.width - 290.).max(1.),
         );
         let greeting = container(
-            text(greeting_text)
-                .font(theme::USER_FONT)
-                .size(greeting_size)
-                .line_height(1.25)
-                .color(theme::palette().orange),
+            iced::widget::row![
+                chrome::settings_button(true, 25.),
+                text(greeting_text)
+                    .font(theme::USER_FONT)
+                    .size(greeting_size)
+                    .line_height(1.25)
+                    .color(theme::palette().orange)
+            ]
+            .spacing(10)
+            .align_y(iced::Center),
         )
         .width(iced::Fill)
         .align_x(iced::Right)
-        .padding(iced::Padding::ZERO.top(37).right(70));
+        .padding(iced::Padding::ZERO.top(30).right(70));
         let home = tooltip(
             button(iced::widget::Space::new().width(124).height(40))
                 .padding(0)
@@ -471,11 +428,29 @@ pub fn view<'a>(
             container(avatar).padding(
                 iced::Padding::ZERO
                     .left(avatar_center.x - 40. * content)
-                    .top(avatar_center.y - 40. * content)
+                    .top(avatar_center.y - (40. + HEADER_HEIGHT) * content)
             ),
         ];
         stack![
-            container(body).center_x(iced::Fill).center_y(iced::Fill),
+            container(
+                scrollable(container(body).center_x(iced::Fill))
+                    .direction(scrollable::Direction::Vertical(
+                        scrollable::Scrollbar::new()
+                            .width(6)
+                            .scroller_width(6)
+                            .margin(4)
+                    ))
+                    .style(|theme, status| {
+                        let mut style = scrollable::default(theme, status);
+                        style.vertical_rail.background = None;
+                        style.vertical_rail.scroller.background =
+                            super::theme::palette().pending.into();
+                        style
+                    })
+                    .width(iced::Fill)
+                    .height(iced::Fill)
+            )
+            .padding(iced::Padding::ZERO.top(HEADER_HEIGHT)),
             chrome::brand(),
             greeting,
             container(home).padding(iced::Padding::ZERO.left(50).top(30)),

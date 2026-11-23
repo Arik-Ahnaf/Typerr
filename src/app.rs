@@ -770,11 +770,26 @@ impl App {
         stack![
             typing,
             score,
-            crate::ui::chrome::brand(),
-            crate::ui::chrome::user_name(
-                self.user_name(),
-                enabled && !matches!(self.page, Page::Transition { .. })
-            )
+            iced::widget::responsive(move |size| {
+                let scale = if matches!(self.page, Page::Typing | Page::Transition { .. }) {
+                    crate::ui::sizing::Preset::for_typing(size, self.settings.line_height()).scale()
+                } else {
+                    1.
+                };
+                stack![
+                    Space::new().width(iced::Fill).height(iced::Fill),
+                    crate::ui::chrome::scaled_brand(scale),
+                    crate::ui::chrome::scaled_user_name(
+                        self.user_name(),
+                        enabled && !matches!(self.page, Page::Transition { .. }),
+                        (30. - 5. * opacity) * scale,
+                        scale,
+                    )
+                ]
+                .width(iced::Fill)
+                .height(iced::Fill)
+                .into()
+            })
         ]
         .into()
     }
@@ -1880,12 +1895,12 @@ mod tests {
         assert_eq!(app.page, Page::Dashboard);
         assert_eq!(app.main.generation, generation);
         for (size, point) in [
-            (iced::Size::new(1400., 800.), iced::Point::new(310., 110.)),
-            (iced::Size::new(1920., 1080.), iced::Point::new(440., 160.)),
+            (iced::Size::new(1400., 800.), iced::Point::new(230., 80.)),
+            (iced::Size::new(1920., 1080.), iced::Point::new(360., 80.)),
             (iced::Size::new(700., 900.), iced::Point::new(150., 95.)),
         ] {
             app.page = Page::Dashboard;
-            // The formerly scaled logo location must no longer activate Home.
+            // Body space outside the avatar must not activate the fixed Home control.
             click_at_size(&mut app, point.x, point.y, mouse::Button::Left, size);
             assert_eq!(app.page, Page::Dashboard);
             click_at_size(&mut app, 100., 45., mouse::Button::Left, size);

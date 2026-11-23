@@ -1227,3 +1227,75 @@ installer executable equality, and distribution checksums passed. Evidence:
 `target/packaging/arch.1yysNM/` and `target/packaging/windows.BJw2dM/`.
 Previous distribution files were retained. No commit, push, or release was made.
 GUI interaction and native Windows execution were not tested; installer unsigned.
+
+
+## Aligned header and Settings cog — 2026-11-12
+
+- Compared current Figma Typing 54:22, Score 59:3, Dashboard 86:50, and
+  Settings 91:26. Embedded the refreshed keyboard/wordmark artwork, keeping
+  the brand at 127 × 26 and top=30 on all pages. The wordmark alpha is tinted
+  with the active foreground. Added the supplied 20px fa-cog before account
+  names and the Dashboard greeting, wired to existing OpenSettings behavior.
+- Moved the Dashboard greeting and Score Tab hint to top=30. The hint now
+  belongs to the fixed header rather than the scaled Score canvas. Retained
+  bundled Google Sans Code, fitted without wrapping to the Figma hint slot.
+  Account height follows the design's 30px Typing / 25px Score geometry;
+  long names fit beside the hint, and both header actions disable during fades.
+- Validation: formatting, strict all-target Clippy, all 138 tests, locked
+  debug/release builds with CARGO_BUILD_JOBS=2, and git diff --check pass.
+  Native software-renderer captures and synthetic pointer checks cover all four
+  presets, their boundaries, wide/tall windows, cog/account activation, and
+  disabled controls. Inspected Typing, Score, Dashboard, Settings, large-size,
+  and 16-character-name header captures. Evidence: target/header-verification/.
+- These are headless native-renderer checks, not physical-pointer interaction
+  or native Windows/Wayland validation. Existing page-body/data behavior remains
+  unchanged; native platform checks remain recommended. No push or release.
+
+### Header alignment correction — 2026-11-12
+
+The supplied large-window screenshot exposed scaled typing controls positioned
+below fixed-size branding/account elements. Typing now shares its actual preset
+with the brand and account text/height, with a fixed 30px top margin and vertically
+centered brand artwork. Amount menus track the corrected control row. Score and
+Dashboard retain their smaller header sizes. This supersedes the fixed-size
+Typing header decision above. Native renderer inspection at 1920 × 1080 confirms
+alignment; formatting, strict Clippy, 138 tests and debug/release builds pass.
+Physical pointer and Windows/Wayland checks remain unverified.
+
+## Scrollable Dashboard refresh — 2026-11-23
+
+- Inspected current Figma `86:50` design context and its 700 × 589 screenshot.
+  Retained the 589px reference instead of shrinking content or increasing the
+  application's minimum height. The 514px body below the fixed 75px header is a
+  native Iced vertical scrollable, horizontally centered and scaled by the actual
+  window's existing preset. Profile/avatar, summary, bests, separator, and charts
+  scroll together; branding, greeting, Settings cog, and Home target stay fixed.
+- Replaced the two pasted chart references with native Canvas charts in their
+  exact design slots. Reused Typerr's palette, Google Sans Code, and rounded card
+  styling. The activity calendar shows twelve months of UTC completed-test counts,
+  Monday-first weeks, month labels, four intensity levels, and hover date/counts.
+  The all-time WPM histogram retains adaptive twelve-bin counts and adds hover
+  range/counts. Empty and unavailable states remain distinct.
+- Added parameterized daily aggregation with zero-filled dates and leap-year
+  handling to the existing background Dashboard transaction. Existing timestamps,
+  schema, completion index, worker, history, and score calculations are preserved.
+  Added no dependencies or settings writes. Existing uncommitted header work and
+  assets were preserved; the existing navigation test's negative-click locations
+  were moved away from the newly positioned avatar.
+- Validation: formatting, strict locked all-target Clippy, all **141 tests**
+  (42 library, 86 application/widget, 11 storage, 2 layout), locked debug/release
+  builds with two Cargo jobs, and `git diff --check` pass. Added calendar/leap-day/
+  UTC-boundary and queued-save checks plus actual widget-tree scrolling at all
+  four presets. The latter compares header pixels, confirms body movement and
+  avatar hit-target movement, ignores wheel events over the header, exercises
+  fixed Home navigation, and returns to the original body geometry.
+- Inspected headless native software-renderer captures at 700 × 589, minimum
+  700 × 400, 1200 × 700, 1400 × 800, and 1800 × 1000, including bottom scrolling,
+  empty/unavailable history, and hover details at design and 2× sizes. Also
+  captured wide/short and narrow/tall layouts. Reused embedded brand/cog/avatar
+  assets are nonempty and rendered in their existing slots. Evidence and the
+  standalone verification harness: `target/dashboard-refresh-verification/`.
+- These are native-renderer and injected-widget-event checks, not a desktop GUI
+  launch or physical-pointer verification. Native Windows and Wayland runtime
+  checks remain unverified and are the recommended next validation. No package,
+  commit, push, or release was produced.

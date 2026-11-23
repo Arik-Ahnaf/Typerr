@@ -415,6 +415,13 @@ fn dashboard_worker_snapshot_follows_queued_saves_without_reopening() {
         .unwrap();
     assert_eq!(data.summary.completed_tests, 25);
     assert_eq!(data.bins[8], 25);
+    assert_eq!(
+        data.activity
+            .iter()
+            .map(|day| day.completed_tests)
+            .sum::<u64>(),
+        25
+    );
     assert_eq!(data.personal_bests[0].test.accuracy, 96.);
     writer.save(&Score::default(), TestMode::Words, 10, Options::default());
     assert_eq!(
@@ -427,4 +434,77 @@ fn dashboard_worker_snapshot_follows_queued_saves_without_reopening() {
             .completed_tests,
         26
     );
+}
+
+#[test]
+fn activity_fills_calendar_days_and_obeys_utc_boundaries() {
+    let store = ScoreStore::in_memory().unwrap();
+    let calendar = Connection::open_in_memory().unwrap();
+    let at = |date: &str| {
+        calendar
+            .query_row(
+                "SELECT CAST(strftime('%s', ?1) AS INTEGER) * 1000",
+                [date],
+                |r| r.get::<_, i64>(0),
+            )
+            .unwrap()
+    };
+    let now = at("2026-11-23 12:00:00");
+    let start = at("2025-11-24");
+    let midnight = at("2026-11-23");
+    let tomorrow = at("2026-11-24");
+    for timestamp in [
+        start - 1,
+        start,
+        midnight - 1,
+        midnight,
+        tomorrow - 1,
+        tomorrow,
+    ] {
+        store
+            .insert(&CompletedTest {
+                completed_at_ms: timestamp,
+                ..sample()
+            })
+            .unwrap();
+    }
+    let snapshot = store.dashboard_at(now).unwrap();
+    assert_eq!(snapshot.activity.len(), 365);
+    assert_eq!(snapshot.activity[0].date, "2025-11-24");
+    assert_eq!(snapshot.activity[0].completed_tests, 1);
+    assert_eq!(snapshot.activity.last().unwrap().date, "2026-11-23");
+    assert_eq!(snapshot.activity.last().unwrap().completed_tests, 2);
+    assert_eq!(snapshot.activity[363].completed_tests, 1);
+    assert_eq!(
+        snapshot
+            .activity
+            .iter()
+            .map(|day| day.completed_tests)
+            .sum::<u64>(),
+        4
+    );
+    assert_eq!(snapshot.summary.completed_tests, 6); // Other charts remain all-time.
+    assert_eq!(snapshot.bins.iter().sum::<u64>(), 6);
+    assert!(
+        snapshot
+            .activity
+            .windows(2)
+            .all(|days| days[1].unix_day == days[0].unix_day + 1)
+    );
+    assert_eq!(snapshot.activity[1].completed_tests, 0);
+
+    for (date, first, length) in [
+        ("2024-02-29", "2023-03-01", 366),
+        ("2025-02-28", "2024-02-29", 366),
+        ("2026-01-01", "2025-01-02", 365),
+    ] {
+        let empty = ScoreStore::in_memory()
+            .unwrap()
+            .dashboard_at(at(date))
+            .unwrap();
+        assert_eq!(empty.activity[0].date, first);
+        assert_eq!(empty.activity.last().unwrap().date, date);
+        assert_eq!(empty.activity.len(), length);
+        assert!(empty.activity.iter().all(|day| day.completed_tests == 0));
+    }
 }

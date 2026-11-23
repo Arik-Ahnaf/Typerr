@@ -1,5 +1,9 @@
 //! Local completed-test history. SQL and filesystem I/O stay outside scoring/UI.
-use std::{fmt, path::Path, time::Duration};
+use std::{
+    fmt,
+    path::Path,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 
 use rusqlite::{Connection, TransactionBehavior, params};
 
@@ -125,13 +129,22 @@ pub struct Summary {
     pub highest_accuracy: Option<f64>,
 }
 
-/// One consistent Dashboard read, including an all-time WPM histogram.
+/// A UTC calendar day, including days without completed tests.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActivityDay {
+    pub unix_day: i64,
+    pub date: String,
+    pub completed_tests: u64,
+}
+
+/// One consistent Dashboard read, including daily activity and an all-time histogram.
 #[derive(Debug, Default, Clone)]
 pub struct DashboardData {
     pub summary: Summary,
     pub personal_bests: Vec<StoredScore>,
     pub bin_width: f64,
     pub bins: [u64; 12],
+    pub activity: Vec<ActivityDay>,
 }
 
 /// UTC range is start-inclusive and end-exclusive. None means no restriction.
@@ -149,6 +162,18 @@ pub struct ScoreStore {
 
 impl ScoreStore {
     pub fn dashboard(&self) -> Result<DashboardData> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .ok()
+            .and_then(|time| i64::try_from(time.as_millis()).ok())
+            .ok_or(Error::Invalid(
+                "wall clock is outside the supported timestamp range",
+            ))?;
+        self.dashboard_at(now)
+    }
+
+    /// Inject the reference UTC date for deterministic calendar reads.
+    pub fn dashboard_at(&self, now_ms: i64) -> Result<DashboardData> {
         let transaction = self.connection.unchecked_transaction()?;
         let summary = self.summary()?;
         // Keep twelve readable ranges, widening by multiples of ten as needed.
@@ -167,12 +192,27 @@ impl ScoreStore {
                 bins[index.min(11)] = count;
             }
         }
+        let activity = {
+            let mut statement = self
+                .connection
+                .prepare(include_str!("storage/activity.sql"))?;
+            statement
+                .query_map([now_ms], |row| {
+                    Ok(ActivityDay {
+                        unix_day: row.get(0)?,
+                        date: row.get(1)?,
+                        completed_tests: row.get::<_, i64>(2)? as u64,
+                    })
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
         transaction.commit()?;
         Ok(DashboardData {
             summary,
             personal_bests,
             bin_width,
             bins,
+            activity,
         })
     }
 

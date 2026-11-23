@@ -2,7 +2,9 @@
 use super::theme;
 use crate::app::{Message, Mode};
 use iced::advanced::text::{self as native_text, Paragraph};
-use iced::widget::{Space, button, container, mouse_area, row, stack, svg, text};
+use iced::widget::{
+    Space, button, container, image, mouse_area, responsive, row, stack, svg, text, tooltip,
+};
 use iced::{Element, Fill, Font, Renderer, Size};
 use typerr::words;
 
@@ -54,56 +56,145 @@ fn group(
         .into()
 }
 
+/// Fixed Figma header artwork: 38px keyboard, 5px gap, 84px wordmark.
 pub fn brand() -> Element<'static, Message> {
-    let brand = row![
-        container(icon(
-            include_bytes!("../../assets/icons/keyboard.svg"),
-            37.0,
-            25.0
-        ))
-        .padding(iced::Padding::ZERO.top(7)),
-        text("Typerr")
-            .font(theme::BRAND_FONT)
-            .size(48)
-            .line_height(1.0),
-    ]
-    .spacing(8);
-    container(brand)
-        .padding(iced::Padding::ZERO.top(30).left(50))
-        .into()
+    scaled_brand(1.)
 }
 
-/// Shared Dashboard entry point, disabled during the completion fade.
-pub fn user_name(name: &str, enabled: bool) -> Element<'_, Message> {
-    let account = button(
-        container(
-            text(name)
-                .font(theme::USER_FONT)
-                .size(fitted_size(name, theme::USER_FONT, 20., 178.))
-                .line_height(1.0),
-        )
-        .padding([0, 11])
-        .width(iced::Length::Shrink)
-        .max_width(200)
-        .align_x(iced::Center)
-        .center_y(30),
+pub fn scaled_brand(scale: f32) -> Element<'static, Message> {
+    static WORDMARK: std::sync::OnceLock<image::Handle> = std::sync::OnceLock::new();
+    let wordmark = WORDMARK.get_or_init(|| {
+        let mut pixels =
+            ::image::load_from_memory(include_bytes!("../../assets/icons/brand-wordmark.png"))
+                .expect("valid bundled wordmark")
+                .into_rgba8();
+        let color = theme::palette().correct.into_rgba8();
+        for pixel in pixels.pixels_mut() {
+            pixel.0[..3].copy_from_slice(&color[..3]);
+        }
+        image::Handle::from_rgba(pixels.width(), pixels.height(), pixels.into_raw())
+    });
+    container(
+        row![
+            icon(
+                include_bytes!("../../assets/icons/brand-keyboard.svg"),
+                38. * scale,
+                26. * scale
+            ),
+            image(wordmark.clone())
+                .width(84. * scale)
+                .height(26. * scale),
+        ]
+        .spacing(5. * scale),
     )
-    .padding(0)
-    .on_press_maybe(enabled.then_some(Message::Dashboard))
-    .style(|_, status| button::Style {
-        background: Some(theme::palette().control_background.into()),
+    .padding(iced::Padding::ZERO.top(30. + 2. * scale).left(50))
+    .into()
+}
+
+pub(super) fn settings_button(enabled: bool, height: f32) -> Element<'static, Message> {
+    let cog = svg(svg::Handle::from_memory(include_bytes!(
+        "../../assets/icons/fa-cog.svg"
+    )))
+    .width(20)
+    .height(20)
+    .style(|_, _| svg::Style {
+        color: Some(theme::palette().pending),
+    });
+    tooltip(
+        button(container(cog).center_x(20).center_y(height))
+            .padding(0)
+            .on_press_maybe(enabled.then_some(Message::OpenSettings))
+            .style(|_, status| button::Style {
+                background: matches!(status, button::Status::Hovered | button::Status::Pressed)
+                    .then_some(theme::palette().control_background.into()),
+                border: iced::Border::default().rounded(4),
+                ..Default::default()
+            }),
+        "Settings (Ctrl+,)",
+        tooltip::Position::Bottom,
+    )
+    .into()
+}
+
+/// Shared Dashboard and Settings entry points, disabled during completion fades.
+pub fn scaled_user_name(
+    name: &str,
+    enabled: bool,
+    height: f32,
+    scale: f32,
+) -> Element<'_, Message> {
+    responsive(move |size| {
+        // Leave the centered Score hint clear even with a 16-character name.
+        let width = (size.width / 2. - 188. * scale).clamp(70., 200. * scale);
+        let account = button(
+            container(
+                text(name)
+                    .font(theme::USER_FONT)
+                    .size(fitted_size(
+                        name,
+                        theme::USER_FONT,
+                        20. * scale,
+                        width - 24. * scale,
+                    ))
+                    .line_height(1.0),
+            )
+            .padding([0., 12. * scale])
+            .width(iced::Length::Shrink)
+            .max_width(width)
+            .align_x(iced::Center)
+            .center_y(height),
+        )
+        .padding(0)
+        .on_press_maybe(enabled.then_some(Message::Dashboard))
+        .style(|_, status| button::Style {
+            background: Some(theme::palette().control_background.into()),
+            border: iced::Border::default().rounded(8),
+            text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
+                theme::palette().correct
+            } else {
+                theme::palette().pending
+            },
+            ..Default::default()
+        });
+        container(row![settings_button(enabled, height), account].spacing(10))
+            .padding(iced::Padding::ZERO.top(30).right(50))
+            .align_x(iced::Right)
+            .width(Fill)
+            .into()
+    })
+    .into()
+}
+
+/// The restart hint belongs to the fixed header, independently of Score scaling.
+pub fn restart_hint(opacity: f32) -> Element<'static, Message> {
+    let key = container(
+        text("Tab")
+            .font(theme::SEMIBOLD_FONT)
+            .size(16)
+            .line_height(1.0)
+            .color(theme::alpha(theme::palette().background, opacity)),
+    )
+    .center_x(50)
+    .center_y(25)
+    .style(move |_| container::Style {
+        background: Some(theme::alpha(theme::palette().pending, opacity).into()),
         border: iced::Border::default().rounded(8),
-        text_color: if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-            theme::palette().correct
-        } else {
-            theme::palette().pending
-        },
         ..Default::default()
     });
-    container(account)
-        .padding(iced::Padding::ZERO.top(30).right(50))
-        .align_x(iced::Right)
-        .width(Fill)
+    let label = text("to start a new test")
+        .font(theme::SEMIBOLD_FONT)
+        .size(fitted_size(
+            "to start a new test",
+            theme::SEMIBOLD_FONT,
+            16.,
+            141.,
+        ))
+        .wrapping(native_text::Wrapping::None)
+        .line_height(1.0)
+        .color(theme::alpha(theme::palette().pending, opacity));
+    container(row![key, container(label).width(141).center_y(25)].spacing(5))
+        .padding(iced::Padding::ZERO.top(30))
+        .center_x(Fill)
         .into()
 }
 
@@ -157,13 +248,13 @@ pub fn header(
     ]
     .spacing(10. * scale);
     let controls = container(controls)
-        .padding(iced::Padding::ZERO.top(30. * scale))
+        .padding(iced::Padding::ZERO.top(30.))
         .center_x(Fill);
     let picker: Element<'static, Message> = match amount_picker.filter(|_| enabled) {
         Some(mode) => container(amount_bar(mode, scale))
             .padding(
                 iced::Padding::ZERO
-                    .top(65. * scale)
+                    .top(30. + 35. * scale)
                     .left(if mode == Mode::Words {
                         120. * scale
                     } else {
@@ -176,9 +267,9 @@ pub fn header(
     };
     stack![controls, picker]
         .height(if enabled && amount_picker.is_some() {
-            95. * scale
+            30. + 65. * scale
         } else {
-            60. * scale
+            30. + 30. * scale
         })
         .into()
 }

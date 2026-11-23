@@ -385,3 +385,47 @@ hardcoded title: below 40 Novice, 40–59 Keybound, 60–79 Clicksmith,
 and 160+ Machina. Compare full-precision averages against the lower thresholds.
 Empty history starts at Novice; pending/failed history shows N/A. Reuse the
 existing Dashboard snapshot without saving a separate title or changing SQL.
+
+
+## Aligned header refresh — 2026-11-12
+
+Figma 54:22, 59:3, 86:50, and 91:26 now share the 127 × 26 brand at
+(50, 30): bundled 38 × 26 keyboard, 5px gap, and 84 × 26 wordmark.
+The wordmark is a compiled Figma PNG whose alpha is tinted with the active
+foreground, keeping all bundled themes supported. This supersedes the old
+Jomhuria text composition; retain the bundled font and its notice.
+Score's Tab hint is fixed at top=30, centered independently of body presets,
+and uses the existing bundled UI font fitted to its design slot. The account
+is 30px high on Typing and 25px on Score, interpolating during the fade.
+Dashboard greeting moves to top=30. A 20 × 20 fa-cog with a 10px gap precedes
+the account/greeting and opens the existing Settings page (Ctrl+, still works).
+Keep header controls disabled during fades and isolated behind modals. Fit long
+names using renderer metrics so they do not overlap the centered restart hint.
+
+The subsequent screenshot correction scales Typing branding and account text/
+height with its actual typing preset. All three header groups start at 30px;
+center the 26px brand artwork in the 30px control height, scaled together.
+Amount menus follow below that row. Score/Dashboard retain their header sizing.
+
+## Scrollable Dashboard and activity — 2026-11-23
+
+Dashboard Figma `86:50` now uses a 700 × 589 reference. Preserve that content
+height rather than compressing it into 400px or changing the application minimum.
+The branding, Home target, greeting, and Settings cog remain fixed above a 75px
+header boundary. The 514px reference body scrolls vertically and stays horizontally
+centered; cards, avatar/hit targets, separator, and both charts share the existing
+100/125/150/200% preset. Select presets from the actual window, never the taller
+scroll content. This supersedes the older 400px, vertically centered Dashboard.
+
+The two pasted Monkeytype images specify placement only: render native activity
+and WPM charts using Typerr fonts, palette, and card corners. Activity occupies
+(45,287), 610 × 156; the all-time histogram occupies (45,453), 610 × 106.
+Activity shows completed-test counts for the last twelve calendar months through
+today, with Monday-first weeks, UTC day boundaries, zero-filled dates, four blue
+intensity levels, and exact date/count details on hover. Histogram hover shows
+the test count and half-open WPM range. Empty history shows zero activity and an
+empty histogram; unavailable reads show N/A. Never copy fixture chart data.
+
+Read daily aggregates in the same worker transaction as summary, bests, and
+histogram. Reuse completion timestamps and the existing index; no schema change,
+new dependency, settings write, or per-test graph storage is needed.

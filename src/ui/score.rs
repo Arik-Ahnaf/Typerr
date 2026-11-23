@@ -115,32 +115,6 @@ impl ScoreCanvas<'_> {
             .draw_with(|path, color| frame.fill(&path, color));
         });
     }
-
-    fn restart_hint(&self, frame: &mut Frame) {
-        frame.fill(
-            &Path::rounded_rectangle(Point::new(252., 37.), iced::Size::new(50., 25.), 8.into()),
-            theme::alpha(theme::palette().pending, self.opacity),
-        );
-        frame.fill_text(Text {
-            content: "Tab".into(),
-            position: Point::new(277., 40.),
-            size: 16.into(),
-            font: theme::SEMIBOLD_FONT,
-            color: theme::alpha(theme::palette().background, self.opacity),
-            align_x: iced::alignment::Horizontal::Center.into(),
-            line_height: iced::widget::text::LineHeight::Absolute(20.into()),
-            ..Text::default()
-        });
-        frame.fill_text(Text {
-            content: "to start a new test".into(),
-            position: Point::new(307., 40.),
-            size: 16.into(),
-            font: theme::SEMIBOLD_FONT,
-            color: theme::alpha(theme::palette().pending, self.opacity),
-            line_height: iced::widget::text::LineHeight::Absolute(20.into()),
-            ..Text::default()
-        });
-    }
 }
 impl canvas::Program<Message> for ScoreCanvas<'_> {
     type State = ();
@@ -155,7 +129,6 @@ impl canvas::Program<Message> for ScoreCanvas<'_> {
         let mut frame = Frame::new(renderer, bounds.size());
         let scale = bounds.width / 700.;
         frame.scale(scale);
-        self.restart_hint(&mut frame);
         let score = self.score;
         let duration = score.elapsed.as_secs_f32().max(1.);
         let peak = score
@@ -327,10 +300,13 @@ pub fn view(score: &Score, opacity: f32, enabled: bool) -> Element<'_, Message> 
         // Preserve the reference proportions, including glyphs and hit targets.
         // The shared header is composed separately by App and stays fixed-size.
         let scale = super::sizing::Preset::for_window(size).scale();
-        container(scaled_view(score, opacity, enabled, scale))
-            .center_x(iced::Fill)
-            .center_y(iced::Fill)
-            .into()
+        stack![
+            container(scaled_view(score, opacity, enabled, scale))
+                .center_x(iced::Fill)
+                .center_y(iced::Fill),
+            super::chrome::restart_hint(opacity),
+        ]
+        .into()
     })
     .into()
 }

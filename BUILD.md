@@ -146,7 +146,8 @@ desktop's `xdg-desktop-portal` backend, or install `zenity` for the fallback.
 Avatar persistence uses the user settings directory described above.
 
 
-Press Ctrl+, from Typing, Score, or Dashboard to open Settings. Search filters
+Click the cog beside the account name or Dashboard greeting, or press Ctrl+,
+from Typing, Score, or Dashboard to open Settings. Search filters
 its rows; categories jump within the scrollable options panel. Tab/Shift+Tab
 moves between fields, and dropdowns support arrow keys and Enter. Click the
 Typerr brand to start a fresh test. Click Save to atomically save all displayed
@@ -203,3 +204,9 @@ The largest matching preset wins. Branding and account/greeting sizes remain
 fixed. Typing treats the configured font size as its base and can use a smaller
 preset when needed to preserve all four rows. Resizing never saves font values
 or resets a test. These thresholds use logical pixels, independently of OS DPI.
+
+Dashboard retains its taller 700 × 589 design. Its body scrolls below the fixed
+branding/greeting header, including the profile, summary cards, activity calendar,
+and all-time WPM chart. Chart geometry, labels, and hover targets use the same
+preset as the cards. Activity shows the last twelve calendar months of completed
+tests by UTC day; hover a cell or bar for its date/range and test count.
