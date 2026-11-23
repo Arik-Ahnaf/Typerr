@@ -429,3 +429,8 @@ empty histogram; unavailable reads show N/A. Never copy fixture chart data.
 Read daily aggregates in the same worker transaction as summary, bests, and
 histogram. Reuse completion timestamps and the existing index; no schema change,
 new dependency, settings write, or per-test graph storage is needed.
+
+The subsequent chart-spacing correction removes the histogram title and expands
+its card to 610 × 122, with more vertical breathing room and roughly 12–16px
+content insets matching the stats cards. Chart screenshot dimensions are guidance,
+not a fixed constraint; preserve the 589px page and preset scaling.

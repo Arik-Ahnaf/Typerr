@@ -9,7 +9,7 @@ const GRID_Y: f32 = 329.;
 const CELL: f32 = 10.;
 const PLOT: Rectangle = Rectangle {
     x: 89.,
-    y: 478.,
+    y: 486.,
     width: 550.,
     height: 57.,
 };
@@ -132,11 +132,10 @@ fn activity(frame: &mut Frame, data: Option<&DashboardData>, pointer: Option<Poi
 }
 
 fn histogram(frame: &mut Frame, data: Option<&DashboardData>, pointer: Option<Point>) {
-    caption(frame, "All-time WPM", 57., 458., 150., 12.);
     let maximum_count = data.map_or(0, |data| *data.bins.iter().max().unwrap());
     let step = ((maximum_count as f64 / 3.).ceil() as u64).max(1);
     let maximum = step as f64 * 3.;
-    rotated(frame, "Tests", Point::new(56., 524.), 9., theme::FONT);
+    rotated(frame, "Tests", Point::new(56., 532.), 9., theme::FONT);
     for tick in 0..=3 {
         let y = PLOT.y + PLOT.height * (1. - tick as f32 / 3.);
         frame.stroke(
@@ -161,7 +160,7 @@ fn histogram(frame: &mut Frame, data: Option<&DashboardData>, pointer: Option<Po
         }
     }
     let Some(data) = data else {
-        caption(frame, NA, 330., 500., 80., 16.);
+        caption(frame, NA, 330., 508., 80., 16.);
         return;
     };
     let cell = PLOT.width / 12.;
@@ -199,7 +198,7 @@ fn histogram(frame: &mut Frame, data: Option<&DashboardData>, pointer: Option<Po
             &format!("{low}–{high}"),
             Rectangle {
                 x,
-                y: 541.,
+                y: 549.,
                 width: cell - 2.,
                 height: 12.,
             },
@@ -213,11 +212,11 @@ fn histogram(frame: &mut Frame, data: Option<&DashboardData>, pointer: Option<Po
             );
         }
     }
-    caption(frame, &detail, 230., 459., 409., 10.);
+    caption(frame, &detail, 230., 465., 409., 10.);
 }
 
 pub(super) fn draw(frame: &mut Frame, data: Option<&DashboardData>, pointer: Option<Point>) {
-    for (y, height) in [(287., 156.), (453., 106.)] {
+    for (y, height) in [(287., 156.), (453., 122.)] {
         frame.fill(
             &Path::rounded_rectangle(Point::new(45., y), Size::new(610., height), 4.into()),
             theme::palette().control_background,

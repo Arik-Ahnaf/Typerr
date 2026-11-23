@@ -1299,3 +1299,23 @@ Physical pointer and Windows/Wayland checks remain unverified.
   launch or physical-pointer verification. Native Windows and Wayland runtime
   checks remain unverified and are the recommended next validation. No package,
   commit, push, or release was produced.
+
+### Histogram spacing correction — 2026-11-23
+
+Removed the All-time WPM heading and increased histogram card height from 106px
+ to 122px, adding vertical breathing room and moving the plot, axis labels, and
+hover/empty-state details together. Content insets follow the stats cards; the
+pasted chart screenshot no longer dictates exact height. The 589px page and
+existing preset scaling remain intact. Formatting, strict all-target Clippy,
+141 tests, locked debug/release builds, and diff checks pass. Inspected the updated
+700 × 589 native software-renderer capture; no physical-platform verification or
+push was performed for this correction.
+
+### Summary card vertical centering — 2026-11-23
+
+Moved both rows of Word Score Panel statistics down 7.5 reference pixels to
+balance visible text above/below within the 100px card. Column anchors, type
+sizes and row spacing are preserved. Checked the Figma card and supplied image;
+inspected the updated native software-renderer Dashboard capture. Formatting,
+strict Clippy, 141 tests and locked debug/release builds pass. Native Windows/
+Wayland interaction was not checked. Existing chart edits were preserved.

@@ -278,7 +278,8 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
             let column = i % 3;
             let x = [380., 483., 552.][column];
             let width = [100., 67., 86.][column];
-            let y = if i < 3 { 85. } else { 125. };
+            // Center the visible two-row text block in the 75..175 card.
+            let y = if i < 3 { 92.5 } else { 132.5 };
             let heading = Rectangle {
                 x,
                 y,
