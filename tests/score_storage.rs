@@ -508,3 +508,17 @@ fn activity_fills_calendar_days_and_obeys_utc_boundaries() {
         assert!(empty.activity.iter().all(|day| day.completed_tests == 0));
     }
 }
+
+#[test]
+fn dashboard_plot_preserves_real_values_and_excludes_future_results() {
+    let store = ScoreStore::in_memory().unwrap();
+    let test = sample();
+    store.insert(&test).unwrap();
+    let mut future = test.clone();
+    future.completed_at_ms += 1;
+    store.insert(&future).unwrap();
+    let data = store.dashboard_at(test.completed_at_ms).unwrap();
+    assert_eq!(data.as_of_ms, test.completed_at_ms);
+    assert_eq!(data.history.len(), 1);
+    assert_eq!(data.history[0].test, test);
+}

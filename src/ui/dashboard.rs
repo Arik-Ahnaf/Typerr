@@ -1,5 +1,6 @@
-//! Figma Dashboard 86:50: fixed header above a 589px scrollable composition.
+//! Figma Dashboard 86:50: fixed header above a 974px scrollable composition.
 mod charts;
+mod plot;
 #[cfg(test)]
 mod scroll_tests;
 use super::chrome::fitted_size;
@@ -13,7 +14,7 @@ use typerr::storage::{DashboardData, TestMode};
 
 const NA: &str = "N/A";
 const HEADER_HEIGHT: f32 = 75.;
-const DESIGN_HEIGHT: f32 = 589.;
+const DESIGN_HEIGHT: f32 = 974.;
 const BODY_HEIGHT: f32 = DESIGN_HEIGHT - HEADER_HEIGHT;
 
 /// Scale the fixed preset surface; keep glyphs and artwork undistorted.
@@ -168,12 +169,19 @@ fn rotated(frame: &mut Frame, value: &str, position: Point, size: f32, font: Fon
     });
 }
 
+#[derive(Default)]
+struct DashboardState {
+    pointer: Option<Point>,
+    plot: plot::State,
+}
+
 struct DashboardCanvas<'a> {
+    course: crate::settings::Course,
     name: &'a str,
     data: Option<&'a DashboardData>,
 }
 impl canvas::Program<Message> for DashboardCanvas<'_> {
-    type State = Option<Point>;
+    type State = DashboardState;
 
     fn update(
         &self,
@@ -184,21 +192,53 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
     ) -> Option<canvas::Action<Message>> {
         if matches!(
             event,
+            iced::Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+        ) {
+            let scale = Scale::new(bounds.size());
+            if cursor.position_in(bounds).is_some_and(|p| {
+                state.plot.click(
+                    Point::new(p.x / scale.x, p.y / scale.y + HEADER_HEIGHT),
+                    self.course,
+                )
+            }) {
+                return Some(canvas::Action::request_redraw().and_capture());
+            }
+        }
+        if matches!(
+            event,
             iced::Event::Mouse(mouse::Event::CursorMoved { .. } | mouse::Event::CursorLeft)
                 | iced::Event::Window(iced::window::Event::RedrawRequested(_))
         ) {
             let position = cursor.position_in(bounds);
-            if *state != position {
-                *state = position;
+            if state.pointer != position {
+                state.pointer = position;
                 return Some(canvas::Action::request_redraw());
             }
         }
         None
     }
 
+    fn mouse_interaction(
+        &self,
+        state: &Self::State,
+        bounds: Rectangle,
+        cursor: mouse::Cursor,
+    ) -> mouse::Interaction {
+        let scale = Scale::new(bounds.size());
+        if cursor.position_in(bounds).is_some_and(|p| {
+            state
+                .plot
+                .hit(Point::new(p.x / scale.x, p.y / scale.y + HEADER_HEIGHT))
+        }) {
+            mouse::Interaction::Pointer
+        } else {
+            mouse::Interaction::default()
+        }
+    }
+
     fn draw(
         &self,
-        _: &Self::State,
+        state: &Self::State,
         renderer: &Renderer,
         _: &Theme,
         bounds: Rectangle,
@@ -376,6 +416,7 @@ impl canvas::Program<Message> for DashboardCanvas<'_> {
             .position_in(bounds)
             .map(|p| Point::new(p.x / scale.x, p.y / scale.y + HEADER_HEIGHT));
         charts::draw(&mut frame, self.data, pointer);
+        plot::draw(&mut frame, &state.plot, pointer, self.data);
         vec![frame.into_geometry()]
     }
 }
@@ -384,6 +425,7 @@ pub fn view<'a>(
     data: Option<&'a DashboardData>,
     name: &'a str,
     avatar: &'a iced::widget::image::Handle,
+    course: crate::settings::Course,
 ) -> Element<'a, Message> {
     responsive(move |size| {
         let factor = super::sizing::Preset::for_window(size).scale();
@@ -423,7 +465,7 @@ pub fn view<'a>(
             tooltip::Position::Bottom,
         );
         let body = stack![
-            canvas(DashboardCanvas { data, name })
+            canvas(DashboardCanvas { data, name, course })
                 .width(preset_size.width)
                 .height(preset_size.height),
             container(avatar).padding(

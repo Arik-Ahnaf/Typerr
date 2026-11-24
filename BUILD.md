@@ -210,3 +210,14 @@ branding/greeting header, including the profile, summary cards, activity calenda
 and all-time WPM chart. Chart geometry, labels, and hover targets use the same
 preset as the cards. Activity shows the last twelve calendar months of completed
 tests by UTC day; hover a cell or bar for its date/range and test count.
+
+Dashboard also includes a sample plot below the WPM histogram. Its date ranges,
+Advanced mode/amount/punctuation/numbers filters, Current settings shortcut, and
+Speed/Accuracy/Avg of 10/Avg of 100 toggles operate on fixed demonstration data.
+Save as preset / Apply preset retains one selection only while this Dashboard
+widget is open. The extended 974px reference page scrolls below the fixed header;
+existing activity and WPM charts continue to use actual completed-test history.
+
+The plot now uses real completed-test history, superseding the demonstration-data
+description above. Date ranges are trailing 1/7/30/90 days at Dashboard opening;
+All time includes all history. No matching results shows an empty plot.

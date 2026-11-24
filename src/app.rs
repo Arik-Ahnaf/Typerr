@@ -746,6 +746,7 @@ impl App {
                 self.dashboard.as_ref(),
                 self.user_name(),
                 &self.picture.avatar,
+                self.main.course(),
             );
         }
         let opacity = self.page.score_opacity();

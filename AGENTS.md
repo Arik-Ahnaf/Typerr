@@ -434,3 +434,20 @@ The subsequent chart-spacing correction removes the histogram title and expands
 its card to 610 × 122, with more vertical breathing room and roughly 12–16px
 content insets matching the stats cards. Chart screenshot dimensions are guidance,
 not a fixed constraint; preserve the 589px page and preset scaling.
+
+## Dashboard sample plot — 2026-11-24
+
+The plot follow-up authorizes a native UI preview below the existing histogram,
+using Figma `197:12` as the chart/filter reference and the current app palette
+and spacing. The histogram retains its 122px height; the new card starts at
+585px with a 10px gap. Dashboard reference height is now 974px; the fixed header
+and discrete presets are unchanged. `ui/dashboard/plot.rs` owns deterministic
+sample values, date/mode/amount/option filters, series visibility, and a transient
+preset. Current settings copies the selected typing course into plot filters.
+All sample data and plot controls are UI-only, explicitly labeled Sample data;
+never save these values as history or substitute them into existing real charts.
+
+The real-stats follow-up replaces demonstration plot data with completed-test
+summaries from the existing worker transaction. Preserve actual values, handle
+empty/unavailable history, and scale WPM to include high results and accuracy
+from 0–100. Filters/presets remain transient; no generated data enters the plot.

@@ -18,7 +18,12 @@ fn body_scrolls_at_each_preset_while_header_and_hit_targets_stay_fixed() {
         Size::new(1800., 1000.),
     ] {
         let scale = super::super::sizing::Preset::for_window(size).scale();
-        let mut view = view(None, "Eric", &picture.avatar);
+        let mut view = view(
+            None,
+            "Eric",
+            &picture.avatar,
+            crate::settings::Course::default(),
+        );
         let mut tree = Tree::new(&view);
         let node =
             view.as_widget_mut()
@@ -135,6 +140,17 @@ fn body_scrolls_at_each_preset_while_header_and_hit_targets_stay_fixed() {
             .iter()
             .any(|m| matches!(m, Message::BackToTyping))
         );
+        let series = Point::new(
+            (size.width - 700. * scale) / 2. + 300. * scale,
+            size.height - (DESIGN_HEIGHT - 934.) * scale,
+        );
+        send(&mut view, &mut tree, &renderer, click, series);
+        assert_ne!(
+            after,
+            capture(&view, &tree, &mut renderer),
+            "plot series toggle after scrolling at {size:?}"
+        );
+        send(&mut view, &mut tree, &renderer, click, series);
         send(
             &mut view,
             &mut tree,

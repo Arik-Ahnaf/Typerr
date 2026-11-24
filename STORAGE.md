@@ -92,3 +92,11 @@ A failed query is logged to stderr and the existing local log. Dashboard renders
 N/A for unavailable metrics and refreshes on each opening. Empty history shows
 zero activity counts and an empty histogram. Profile editing,
 profile persistence, and historical per-test Score graphs remain excluded.
+
+The Dashboard plot now loads chronological completed-test summaries in that same
+worker transaction (through its reference timestamp), and filters the snapshot
+locally by trailing 1/7/30/90 days, mode, amount and options. All time includes
+all stored dates. Plot values are real WPM/accuracy; rolling averages use the last
+10/100 matching results, using available results at the beginning. No schema
+change or per-test time-series storage is needed. This supersedes the statement
+above that Dashboard does not load history records.

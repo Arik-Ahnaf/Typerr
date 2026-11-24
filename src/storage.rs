@@ -145,6 +145,8 @@ pub struct DashboardData {
     pub bin_width: f64,
     pub bins: [u64; 12],
     pub activity: Vec<ActivityDay>,
+    pub history: Vec<StoredScore>,
+    pub as_of_ms: i64,
 }
 
 /// UTC range is start-inclusive and end-exclusive. None means no restriction.
@@ -206,6 +208,10 @@ impl ScoreStore {
                 })?
                 .collect::<rusqlite::Result<Vec<_>>>()?
         };
+        let history = self.history(HistoryFilter {
+            until_ms: Some(now_ms.saturating_add(1)),
+            ..HistoryFilter::default()
+        })?;
         transaction.commit()?;
         Ok(DashboardData {
             summary,
@@ -213,6 +219,8 @@ impl ScoreStore {
             bin_width,
             bins,
             activity,
+            history,
+            as_of_ms: now_ms,
         })
     }
 

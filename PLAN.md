@@ -1319,3 +1319,44 @@ sizes and row spacing are preserved. Checked the Figma card and supplied image;
 inspected the updated native software-renderer Dashboard capture. Formatting,
 strict Clippy, 141 tests and locked debug/release builds pass. Native Windows/
 Wayland interaction was not checked. Existing chart edits were preserved.
+
+## Dashboard sample plot and filters — 2026-11-24
+
+- Inspected Figma Dashboard `86:50` and plot reference `197:12`. Added a native
+  Canvas plot below the WPM histogram with the app's palette, fonts, 4px corners,
+  12px content insets, and 10px inter-card gap. Preserved the existing histogram
+  spacing; extended the scrollable reference to 974px with fixed header/presets.
+- `ui/dashboard/plot.rs` owns fixed pseudo-random demonstration results covering
+  120 days, both modes, all amounts, and punctuation/number combinations. The
+  plot is labeled Sample data and does not read or write history. Existing
+  activity, histogram, profile statistics, and typing behavior are unchanged.
+- Added five date ranges, All, Current settings, Advanced mode/amount/options,
+  transient Save as preset / Apply preset, sample hover values, and independent
+  Speed/Accuracy/Avg of 10/Avg of 100 visibility controls. Individual results
+  render as dots and moving averages as lines; axes show WPM and accuracy.
+- Validation: formatting, strict locked all-target Clippy, 142 tests, and locked
+  debug/release builds. Filter tests cover selection, current-course copying,
+  preset restoration and visibility; widget-event checks exercise scrolling,
+  fixed headers, and series clicks at all four presets. Inspected native
+  software-renderer screenshots at reference and 2x sizing, including Advanced.
+  Evidence: `target/plot-verification/`. No new dependencies or asset changes.
+- Native Windows/Wayland and physical-pointer interaction remain unverified.
+  Filters/preset are transient UI state; connecting this preview to real history
+  requires a separately authorized follow-up. No commit, push or release.
+
+## Real Dashboard plot history — 2026-11-24
+
+Replaced the demonstration fixture with chronological stored completed-test
+summaries, loaded in the existing background Dashboard transaction. Filters
+intersect real mode, amount, punctuation, numbers and trailing date ranges;
+All time includes all dates. Future timestamps are excluded at snapshot time.
+WPM scales upward for high scores; accuracy covers 0–100. Empty/unavailable
+history has explicit text and no fabricated points. Rolling averages use
+available preceding matching tests; presets remain transient. No schema change.
+
+Validation: formatting, strict all-target Clippy, 143 tests, locked debug/release
+builds, and diff checks pass. Added snapshot/future-time and real-filter tests;
+inspected the native software-renderer plot using isolated SQLite fixture
+history. Native Windows/Wayland and physical-pointer checks remain unverified.
+The snapshot loads all summaries into memory; very large histories may warrant
+worker-side filtering/downsampling in a future performance follow-up.
