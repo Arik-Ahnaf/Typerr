@@ -1360,3 +1360,13 @@ inspected the native software-renderer plot using isolated SQLite fixture
 history. Native Windows/Wayland and physical-pointer checks remain unverified.
 The snapshot loads all summaries into memory; very large histories may warrant
 worker-side filtering/downsampling in a future performance follow-up.
+
+## Discord push notification fix — 2026-11-24
+
+- Supply an explicit title, head-commit message, and compare URL to the Discord
+  action because push events do not contain a release payload. Update the
+  announcement to describe pushed changes.
+- Validation: reviewed the workflow diff against the action's fallback inputs;
+  `git diff --check` passed. Actionlint and Python PyYAML are unavailable locally.
+  Rust checks were not run for this workflow-only change. Live GitHub Actions
+  execution and Discord delivery remain unverified until the change is pushed.
